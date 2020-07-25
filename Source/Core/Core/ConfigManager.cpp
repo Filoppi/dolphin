@@ -146,6 +146,7 @@ void SConfig::SaveInterfaceSettings(IniFile& ini)
   interface->Set("UsePanicHandlers", bUsePanicHandlers);
   interface->Set("OnScreenDisplayMessages", bOnScreenDisplayMessages);
   interface->Set("HideCursor", bHideCursor);
+  interface->Set("LockCursor", bLockCursor);
   interface->Set("LanguageCode", m_InterfaceLanguage);
   interface->Set("ExtendedFPSInfo", m_InterfaceExtendedFPSInfo);
   interface->Set("ShowActiveTitle", m_show_active_title);
@@ -219,8 +220,9 @@ void SConfig::SaveCoreSettings(IniFile& ini)
   core->Set("OverrideRegionSettings", bOverrideRegionSettings);
   core->Set("DPL2Decoder", bDPL2Decoder);
   core->Set("AudioLatency", iLatency);
+  core->Set("UseOSMixerSampleRate", &bUseOSMixerSampleRate);
   core->Set("AudioStretch", m_audio_stretch);
-  core->Set("AudioStretchMaxLatency", m_audio_stretch_max_latency);
+  core->Set("AudioEmuSpeedTolerance", &m_audio_emu_speed_tolerance);
   core->Set("AgpCartAPath", m_strGbaCartA);
   core->Set("AgpCartBPath", m_strGbaCartB);
   core->Set("SlotA", m_EXIDevice[0]);
@@ -278,6 +280,7 @@ void SConfig::SaveDSPSettings(IniFile& ini)
 
 #ifdef _WIN32
   dsp->Set("WASAPIDevice", sWASAPIDevice);
+  dsp->Set("WASAPIDeviceSampleRate", sWASAPIDeviceSampleRate);
 #endif
 }
 
@@ -413,6 +416,7 @@ void SConfig::LoadInterfaceSettings(IniFile& ini)
   interface->Get("UsePanicHandlers", &bUsePanicHandlers, true);
   interface->Get("OnScreenDisplayMessages", &bOnScreenDisplayMessages, true);
   interface->Get("HideCursor", &bHideCursor, false);
+  interface->Get("LockCursor", &bLockCursor, false);
   interface->Get("LanguageCode", &m_InterfaceLanguage, "");
   interface->Get("ExtendedFPSInfo", &m_InterfaceExtendedFPSInfo, false);
   interface->Get("ShowActiveTitle", &m_show_active_title, true);
@@ -489,8 +493,9 @@ void SConfig::LoadCoreSettings(IniFile& ini)
   core->Get("OverrideRegionSettings", &bOverrideRegionSettings, false);
   core->Get("DPL2Decoder", &bDPL2Decoder, false);
   core->Get("AudioLatency", &iLatency, 20);
+  core->Get("UseOSMixerSampleRate", &bUseOSMixerSampleRate, false);
   core->Get("AudioStretch", &m_audio_stretch, false);
-  core->Get("AudioStretchMaxLatency", &m_audio_stretch_max_latency, 80);
+  core->Get("AudioEmuSpeedTolerance", &m_audio_emu_speed_tolerance, 10);
   core->Get("AgpCartAPath", &m_strGbaCartA);
   core->Get("AgpCartBPath", &m_strGbaCartB);
   core->Get("SlotA", (int*)&m_EXIDevice[0], ExpansionInterface::EXIDEVICE_MEMORYCARDFOLDER);
@@ -559,6 +564,7 @@ void SConfig::LoadDSPSettings(IniFile& ini)
 
 #ifdef _WIN32
   dsp->Get("WASAPIDevice", &sWASAPIDevice, "default");
+  dsp->Get("WASAPIDeviceSampleRate", &sWASAPIDeviceSampleRate, "0");
 #endif
 
   m_IsMuted = false;
@@ -770,7 +776,7 @@ void SConfig::LoadDefaults()
   bDPL2Decoder = false;
   iLatency = 20;
   m_audio_stretch = false;
-  m_audio_stretch_max_latency = 80;
+  m_audio_emu_speed_tolerance = 10;
   bUsePanicHandlers = true;
   bOnScreenDisplayMessages = true;
 

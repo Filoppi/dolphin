@@ -169,6 +169,12 @@ void InterfacePane::CreateInGame()
   m_checkbox_show_active_title = new QCheckBox(tr("Show Active Title in Window Title"));
   m_checkbox_pause_on_focus_lost = new QCheckBox(tr("Pause on Focus Loss"));
   m_checkbox_hide_mouse = new QCheckBox(tr("Always Hide Mouse Cursor"));
+  m_checkbox_lock_mouse = new QCheckBox(tr("Lock Mouse Cursor"));
+
+  m_checkbox_hide_mouse->setToolTip(
+      tr("Will immediately hide the Mouse Cursor when it hovers on top of the Game Window, otherwise there is a delay.\nIf \"Lock Mouse Cursor\" is enabled, it will hide on Mouse locked"));
+  m_checkbox_lock_mouse->setToolTip(
+      tr("Will lock the Mouse Cursor to the Game Window as long as it has focus. You can set hotkey to unlock it"));
 
   groupbox_layout->addWidget(m_checkbox_top_window);
   groupbox_layout->addWidget(m_checkbox_confirm_on_stop);
@@ -177,6 +183,9 @@ void InterfacePane::CreateInGame()
   groupbox_layout->addWidget(m_checkbox_show_active_title);
   groupbox_layout->addWidget(m_checkbox_pause_on_focus_lost);
   groupbox_layout->addWidget(m_checkbox_hide_mouse);
+#ifdef _WIN32
+  groupbox_layout->addWidget(m_checkbox_lock_mouse);
+#endif
 }
 
 void InterfacePane::ConnectLayout()
@@ -200,6 +209,8 @@ void InterfacePane::ConnectLayout()
   connect(m_checkbox_pause_on_focus_lost, &QCheckBox::toggled, this, &InterfacePane::OnSaveConfig);
   connect(m_checkbox_hide_mouse, &QCheckBox::toggled, &Settings::Instance(),
           &Settings::SetHideCursor);
+  connect(m_checkbox_lock_mouse, &QCheckBox::toggled, &Settings::Instance(),
+          &Settings::SetLockCursor);
   connect(m_checkbox_use_userstyle, &QCheckBox::toggled, this, &InterfacePane::OnSaveConfig);
 }
 
@@ -236,6 +247,7 @@ void InterfacePane::LoadConfig()
   m_checkbox_use_covers->setChecked(Config::Get(Config::MAIN_USE_GAME_COVERS));
   m_checkbox_focused_hotkeys->setChecked(Config::Get(Config::MAIN_FOCUSED_HOTKEYS));
   m_checkbox_hide_mouse->setChecked(Settings::Instance().GetHideCursor());
+  m_checkbox_lock_mouse->setChecked(Settings::Instance().GetLockCursor());
 }
 
 void InterfacePane::OnSaveConfig()

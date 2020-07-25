@@ -132,6 +132,11 @@ bool Host_RendererHasFocus()
   return true;
 }
 
+bool Host_RendererHasFullFocus()
+{
+  return true;
+}
+
 bool Host_RendererIsFullscreen()
 {
   return false;

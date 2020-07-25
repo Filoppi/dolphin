@@ -4,14 +4,15 @@
 
 #include <algorithm>
 
+#include "Core/Core.h"
+
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControllerInterface/DInput/DInput.h"
 #include "InputCommon/ControllerInterface/DInput/DInputKeyboardMouse.h"
 
-// (lower would be more sensitive) user can lower sensitivity by setting range
-// seems decent here ( at 8 ), I don't think anyone would need more sensitive than this
-// and user can lower it much farther than they would want to with the range
-#define MOUSE_AXIS_SENSITIVITY 8
+// just a default value which works well at default at 800dpi.
+// Users can multiply it anyway (lower is more sensitive)
+#define MOUSE_AXIS_SENSITIVITY 17
 
 // if input hasn't been received for this many ms, mouse input will be skipped
 // otherwise it is just some crazy value
@@ -38,18 +39,24 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
   // mouse and keyboard are a combined device, to allow shift+click and stuff
   // if that's dumb, I will make a VirtualDevice class that just uses ranges of inputs/outputs from
   // other devices
-  // so there can be a separated Keyboard and mouse, as well as combined KeyboardMouse
+  // so there can be a separated Keyboard and Mouse, as well as combined KeyboardMouse.
 
   LPDIRECTINPUTDEVICE8 kb_device = nullptr;
   LPDIRECTINPUTDEVICE8 mo_device = nullptr;
 
+  // Make sure the SetCooperativeLevel hwnd is valid when we release the device
+  //Otherwise, go back to "void ControllerInterface::RefreshDevices()" and comment it out.
+  //Otherwise see https://bugs.dolphin-emu.org/issues/11702?next_issue_id=11700&prev_issue_id=11704
+  // These are "virtual" system devices, so they are always there even if we have no physical
+  // mouse and keyboard plugged into the computer
   if (SUCCEEDED(idi8->CreateDevice(GUID_SysKeyboard, &kb_device, nullptr)) &&
       SUCCEEDED(kb_device->SetDataFormat(&c_dfDIKeyboard)) &&
-      SUCCEEDED(kb_device->SetCooperativeLevel(nullptr, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)) &&
+      SUCCEEDED(kb_device->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND)) &&
       SUCCEEDED(idi8->CreateDevice(GUID_SysMouse, &mo_device, nullptr)) &&
       SUCCEEDED(mo_device->SetDataFormat(&c_dfDIMouse2)) &&
-      SUCCEEDED(mo_device->SetCooperativeLevel(nullptr, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)))
+      SUCCEEDED(mo_device->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND)))
   {
+    // The device is recreated with a new window handle when we change main window
     g_controller_interface.AddDevice(std::make_shared<KeyboardMouse>(kb_device, mo_device, hwnd));
     return;
   }
@@ -92,19 +99,22 @@ KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
   mouse_caps.dwSize = sizeof(mouse_caps);
   m_mo_device->GetCapabilities(&mouse_caps);
   // mouse buttons
+  mouse_caps.dwButtons = std::min(mouse_caps.dwButtons, (DWORD)sizeof(m_state_in.mouse.rgbButtons));
   for (u8 i = 0; i < mouse_caps.dwButtons; ++i)
     AddInput(new Button(i, m_state_in.mouse.rgbButtons[i]));
   // mouse axes
+  mouse_caps.dwAxes = std::min(mouse_caps.dwAxes, (DWORD)3);
   for (unsigned int i = 0; i < mouse_caps.dwAxes; ++i)
   {
-    const LONG& ax = (&m_state_in.mouse.lX)[i];
+    const LONG& axis = (&m_state_in.mouse.lX)[i];
+    const LONG& prev_axis = (&m_state_in.previous_mouse.lX)[i];
 
     // each axis gets a negative and a positive input instance associated with it
-    AddInput(new Axis(i, ax, (2 == i) ? -1 : -MOUSE_AXIS_SENSITIVITY));
-    AddInput(new Axis(i, ax, -(2 == i) ? 1 : MOUSE_AXIS_SENSITIVITY));
+    AddInput(new Axis(i, axis, prev_axis, (2 == i) ? -1 : -MOUSE_AXIS_SENSITIVITY));
+    AddInput(new Axis(i, axis, prev_axis, (2 == i) ? 1 : MOUSE_AXIS_SENSITIVITY));
   }
   // cursor, with a hax for-loop
-  for (unsigned int i = 0; i < 4; ++i)
+  for (unsigned int i = 0; i <= 3; ++i)
     AddInput(new Cursor(!!(i & 2), (&m_state_in.cursor.x)[i / 2], !!(i & 1)));
 }
 
@@ -133,40 +143,60 @@ void KeyboardMouse::UpdateCursorInput()
 }
 
 void KeyboardMouse::UpdateInput()
-{
-  DIMOUSESTATE2 tmp_mouse;
-
-  // if mouse position hasn't been updated in a short while, skip a dev state
-  DWORD cur_time = GetTickCount();
-  if (cur_time - m_last_update > DROP_INPUT_TIME)
+{  
+  HRESULT kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
+  if (DIERR_INPUTLOST == kb_hr || DIERR_NOTACQUIRED == kb_hr)
   {
-    // set axes to zero
-    m_state_in.mouse = {};
-    // skip this input state
-    m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+    if (SUCCEEDED(m_kb_device->Acquire()))
+      kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
   }
 
-  m_last_update = cur_time;
+  UpdateCursorInput();
 
-  HRESULT kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
-  HRESULT mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
-
-  if (DIERR_INPUTLOST == kb_hr || DIERR_NOTACQUIRED == kb_hr)
-    m_kb_device->Acquire();
-
-  if (DIERR_INPUTLOST == mo_hr || DIERR_NOTACQUIRED == mo_hr)
-    m_mo_device->Acquire();
-
-  if (SUCCEEDED(kb_hr) && SUCCEEDED(mo_hr))
+  //To review: make 2... Leave a high frequency one for the wiimote
+  // Only update the mouse axis twice per game video frame, or always if a game is not running.
+  // This hack is needed because we use the mouse as a fake analog stick axis.
+  // Given that the mouse works with dots (position), all we can get is the number of dots
+  // it moved by since the last update, but updates to this device are called constantly from
+  // different parts of Dolphin, not the game itself, so most of the small changes would be lost
+  // if we always just returned the very last offset.
+  // Another problem in simulating the mouse as an axis is that its speed varies extremely between
+  // frames, differently from an analog stick, this is why we lerp the last 2 values together.
+  // If for some reason we needed this axis to be sub-frame accurate while a game is running
+  // (e.g. to use it with the emulated wiimote, which runs at a higher tick) we could add yet
+  // another input for that exclusively (e.g. HighRefreshRate Axis+ vs GameRefreshRate Axis+).
+  // Note that we also lerp the Z (wheel) axis
+  if (g_controller_interface.ShouldUpdateMouseAxis() || ::Core::GetState() != ::Core::State::Running)
   {
-    // need to smooth out the axes, otherwise it doesn't work for shit
-    for (unsigned int i = 0; i < 3; ++i)
-      ((&m_state_in.mouse.lX)[i] += (&tmp_mouse.lX)[i]) /= 2;
+    DIMOUSESTATE2 tmp_mouse;
 
-    // copy over the buttons
-    memcpy(m_state_in.mouse.rgbButtons, tmp_mouse.rgbButtons, sizeof(m_state_in.mouse.rgbButtons));
+    // if mouse position hasn't been updated in a short while, skip a dev state
+    DWORD cur_time = GetTickCount();
 
-    UpdateCursorInput();
+    // TODO: this just sounds wrong, whatever value we get, it should be handled
+    if (cur_time - m_last_update > DROP_INPUT_TIME)
+    {
+      // set axes to zero
+      m_state_in.mouse = {};
+      m_state_in.previous_mouse = m_state_in.mouse;
+      // skip this input state (by calling this, the next call will return 0)
+      m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+    }
+
+    m_last_update = cur_time;
+
+    // The mouse location this returns is the difference from the last time it was called
+    HRESULT mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+    if (DIERR_INPUTLOST == mo_hr || DIERR_NOTACQUIRED == mo_hr)
+    {
+      if (SUCCEEDED(m_mo_device->Acquire()))
+        mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+    }
+    if (SUCCEEDED(mo_hr))
+    {
+      m_state_in.previous_mouse = m_state_in.mouse;
+      m_state_in.mouse = tmp_mouse;
+    }
   }
 }
 
@@ -220,11 +250,12 @@ ControlState KeyboardMouse::Button::GetState() const
 
 ControlState KeyboardMouse::Axis::GetState() const
 {
-  return ControlState(m_axis) / m_range;
+  // Blend between the last two values (see comments above to understand)
+  return (ControlState(m_axis) + ControlState(m_prev_axis)) * 0.5 / m_range;
 }
 
 ControlState KeyboardMouse::Cursor::GetState() const
 {
-  return m_axis / (m_positive ? 1.0 : -1.0);
+  return m_axis * (m_positive ? 1.0 : -1.0);
 }
 }  // namespace ciface::DInput

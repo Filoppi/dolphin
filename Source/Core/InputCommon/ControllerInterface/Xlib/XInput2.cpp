@@ -35,10 +35,9 @@
 // Mouse axis control tuning. Unlike absolute mouse position, relative mouse
 // motion data needs to be tweaked and smoothed out a bit to be usable.
 
-// Mouse axis control output is simply divided by this number. In practice,
-// that just means you can use a smaller "dead zone" if you bind axis controls
-// to a joystick. No real need to make this customizable.
-#define MOUSE_AXIS_SENSITIVITY 8.0f
+// just a default value which works well at default. Users can multiply it anyway
+// (lower is more sensitive)
+#define MOUSE_AXIS_SENSITIVITY 17.0f
 
 // The mouse axis controls use a weighted running average. Each frame, the new
 // value is the average of the old value and the amount of relative mouse
@@ -284,6 +283,7 @@ void KeyboardMouse::UpdateInput()
     XFreeEventData(m_display, &event.xcookie);
   }
 
+  // TODO: copy new implementation from DInputKeyboardMouse.cpp
   // apply axis smoothing
   m_state.axis.x *= MOUSE_AXIS_SMOOTHING;
   m_state.axis.x += delta_x;

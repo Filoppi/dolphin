@@ -24,6 +24,10 @@
       <Filter>SoundStreams</Filter>
     </ClCompile>
     <ClCompile Include="SurroundDecoder.cpp" />
+    <ClCompile Include="SoundStream.cpp">
+      <Filter>SoundStreams</Filter>
+    </ClCompile>
+    <ClCompile Include="AudioSpeedCounter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AudioCommon.h" />
@@ -57,6 +61,7 @@
     </ClInclude>
     <ClInclude Include="SurroundDecoder.h" />
     <ClInclude Include="Enums.h" />
+    <ClInclude Include="AudioSpeedCounter.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

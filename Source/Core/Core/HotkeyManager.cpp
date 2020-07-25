@@ -24,7 +24,7 @@
 #include "InputCommon/GCPadStatus.h"
 
 // clang-format off
-constexpr std::array<const char*, 138> s_hotkey_labels{{
+constexpr std::array<const char*, 139> s_hotkey_labels{{
     _trans("Open"),
     _trans("Change Disc"),
     _trans("Eject Disc"),
@@ -35,6 +35,7 @@ constexpr std::array<const char*, 138> s_hotkey_labels{{
     _trans("Toggle Fullscreen"),
     _trans("Take Screenshot"),
     _trans("Exit"),
+    _trans("Unlock Cursor"),
     _trans("Activate NetPlay Chat"),
     _trans("Control NetPlay Golf Mode"),
 
@@ -439,11 +440,14 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
   // General hotkeys
   set_key_expression(HK_OPEN, CTRL + " & O");
   set_key_expression(HK_PLAY_PAUSE, NON + " & `F10`");
+  // We need setIgnoreOnFocusChange() when calling stop, as it opens a message box
+  // from the render window, and if we pressed ESC again to close that window,
+  // then the game would re-open it.
 #ifdef _WIN32
-  set_key_expression(HK_STOP, NON + " & ESCAPE");
+  set_key_expression(HK_STOP, NON + " & ESCAPE + setIgnoreOnFocusChange()");
   set_key_expression(HK_FULLSCREEN, ALT + " & RETURN");
 #else
-  set_key_expression(HK_STOP, NON + " & Escape");
+  set_key_expression(HK_STOP, NON + " & Escape + setIgnoreOnFocusChange()");
   set_key_expression(HK_FULLSCREEN, ALT + " & Return");
 #endif
   set_key_expression(HK_STEP, NON + " & `F11`");

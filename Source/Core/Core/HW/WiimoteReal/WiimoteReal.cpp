@@ -39,7 +39,7 @@ static void TryToConnectBalanceBoard(std::unique_ptr<Wiimote>);
 static bool TryToConnectWiimoteToSlot(std::unique_ptr<Wiimote>&, unsigned int);
 static void HandleWiimoteDisconnect(int index);
 
-static bool g_real_wiimotes_initialized = false;
+static bool s_real_wiimotes_initialized = false;
 
 // This is used to store connected Wiimotes' IDs, so we don't connect
 // more than once to the same device.
@@ -845,7 +845,7 @@ void LoadSettings()
 // config dialog calls this when some settings change
 void Initialize(::Wiimote::InitializeMode init_mode)
 {
-  if (!g_real_wiimotes_initialized)
+  if (!s_real_wiimotes_initialized)
   {
     s_wiimote_scanner.StartThread();
   }
@@ -867,12 +867,12 @@ void Initialize(::Wiimote::InitializeMode init_mode)
     }
   }
 
-  if (g_real_wiimotes_initialized)
+  if (s_real_wiimotes_initialized)
     return;
 
   NOTICE_LOG(WIIMOTE, "WiimoteReal::Initialize");
 
-  g_real_wiimotes_initialized = true;
+  s_real_wiimotes_initialized = true;
 }
 
 // called on emulation shutdown
@@ -886,7 +886,7 @@ void Stop()
 // called when the Dolphin app exits
 void Shutdown()
 {
-  g_real_wiimotes_initialized = false;
+  s_real_wiimotes_initialized = false;
   s_wiimote_scanner.StopThread();
 
   NOTICE_LOG(WIIMOTE, "WiimoteReal::Shutdown");

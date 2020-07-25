@@ -531,7 +531,7 @@ void MainWindow::ConnectHotkeys()
   connect(m_hotkey_scheduler, &HotkeyScheduler::Open, this, &MainWindow::Open);
   connect(m_hotkey_scheduler, &HotkeyScheduler::ChangeDisc, this, &MainWindow::ChangeDisc);
   connect(m_hotkey_scheduler, &HotkeyScheduler::EjectDisc, this, &MainWindow::EjectDisc);
-  connect(m_hotkey_scheduler, &HotkeyScheduler::ExitHotkey, this, &MainWindow::close);
+  connect(m_hotkey_scheduler, &HotkeyScheduler::UnlockCursor, this, &MainWindow::UnlockCursor);
   connect(m_hotkey_scheduler, &HotkeyScheduler::TogglePauseHotkey, this, &MainWindow::TogglePause);
   connect(m_hotkey_scheduler, &HotkeyScheduler::ActivateChat, this, &MainWindow::OnActivateChat);
   connect(m_hotkey_scheduler, &HotkeyScheduler::RequestGolfControl, this,
@@ -801,6 +801,11 @@ bool MainWindow::RequestStop()
     return true;
   }
 
+  QWidget* confirm_parent = (m_render_widget->isActiveWindow() && !m_render_widget->isFullScreen()) ?
+                               m_render_widget :
+                               static_cast<QWidget*>(this);
+  bool was_cursor_locked = m_render_widget->IsCursorLocked();
+
   if (!m_render_widget->isFullScreen())
     m_render_widget_geometry = m_render_widget->saveGeometry();
   else
@@ -822,7 +827,7 @@ bool MainWindow::RequestStop()
       Core::SetState(Core::State::Paused);
 
     auto confirm = ModalMessageBox::question(
-        this, tr("Confirm"),
+        confirm_parent, tr("Confirm"),
         m_stop_requested ? tr("A shutdown is already in progress. Unsaved data "
                               "may be lost if you stop the current emulation "
                               "before it completes. Force stop?") :
@@ -833,6 +838,14 @@ bool MainWindow::RequestStop()
     {
       if (pause)
         Core::SetState(state);
+
+      // Return focus to the render window automatically
+      if (confirm_parent == m_render_widget)
+      {
+        // TODO: fix, this only works like 2 times out of 3
+        m_render_widget->SetCursorLockedOnNextActivation(was_cursor_locked);
+        m_render_widget->activateWindow();
+      }
 
       return false;
     }
@@ -903,6 +916,12 @@ void MainWindow::FullScreen()
   {
     m_render_widget->showFullScreen();
   }
+}
+
+void MainWindow::UnlockCursor()
+{
+  if (!m_render_widget->isFullScreen())
+    m_render_widget->SetCursorLocked(false);
 }
 
 void MainWindow::ScreenShot()

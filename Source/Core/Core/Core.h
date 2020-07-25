@@ -126,7 +126,7 @@ void OnFrameEnd();
 void VideoThrottle();
 void RequestRefreshInfo();
 
-void UpdateTitle();
+void UpdateTitle(u32 ElapseTime);
 
 // Run a function as the CPU thread.
 //
@@ -143,7 +143,11 @@ void RunOnCPUThread(std::function<void()> function, bool wait_for_completion);
 
 // for calling back into UI code without introducing a dependency on it in core
 using StateChangedCallbackFunc = std::function<void(Core::State)>;
-void SetOnStateChangedCallback(StateChangedCallbackFunc callback);
+// Returns a handle
+int AddOnStateChangedCallback(StateChangedCallbackFunc callback);
+// Also invalidates the handle
+bool RemoveOnStateChangedCallback(int& handle);
+void CallOnStateChangedCallbacks(Core::State state);
 
 // Run on the Host thread when the factors change. [NOT THREADSAFE]
 void UpdateWantDeterminism(bool initial = false);
@@ -164,7 +168,5 @@ void QueueHostJob(std::function<void()> job, bool run_during_stop = false);
 void HostDispatchJobs();
 
 void DoFrameStep();
-
-void UpdateInputGate(bool require_focus);
 
 }  // namespace Core

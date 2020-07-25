@@ -21,9 +21,11 @@ private:
   {
     BYTE keyboard[256];
     DIMOUSESTATE2 mouse;
+    DIMOUSESTATE2 previous_mouse;
     Common::TVec2<ControlState> cursor;
   };
 
+  // Keyboard key
   class Key : public Input
   {
   public:
@@ -36,31 +38,47 @@ private:
     const u8 m_index;
   };
 
+  // Mouse button
   class Button : public Input
   {
   public:
     Button(u8 index, const BYTE& button) : m_button(button), m_index(index) {}
     std::string GetName() const override;
     ControlState GetState() const override;
+    FocusFlags GetFocusFlags() const override
+    {
+      return FocusFlags(u8(FocusFlags::RequireFocus) | u8(FocusFlags::RequireFullFocus) |
+                        u8(FocusFlags::IgnoreOnFocusChanged));
+    }
 
   private:
     const BYTE& m_button;
     const u8 m_index;
   };
 
+  // Mouse movement offset axis
   class Axis : public Input
   {
   public:
-    Axis(u8 index, const LONG& axis, LONG range) : m_axis(axis), m_range(range), m_index(index) {}
+    Axis(u8 index, const LONG& axis, const LONG& prev_axis, LONG range)
+        : m_axis(axis), m_prev_axis(prev_axis), m_range(range), m_index(index)
+    {
+    }
     std::string GetName() const override;
     ControlState GetState() const override;
+    FocusFlags GetFocusFlags() const override
+    {
+      return FocusFlags(u8(FocusFlags::RequireFocus) | u8(FocusFlags::RequireFullFocus));
+    }
 
   private:
     const LONG& m_axis;
+    const LONG& m_prev_axis;
     const LONG m_range;
     const u8 m_index;
   };
 
+  // Mouse from window center
   class Cursor : public Input
   {
   public:
@@ -69,8 +87,12 @@ private:
     {
     }
     std::string GetName() const override;
-    bool IsDetectable() const override { return false; }
     ControlState GetState() const override;
+    bool IsDetectable() const override { return false; }
+    FocusFlags GetFocusFlags() const override
+    {
+      return FocusFlags((u8(FocusFlags::RequireFocus) | u8(FocusFlags::RequireFullFocus)));
+    }
 
   private:
     const ControlState& m_axis;

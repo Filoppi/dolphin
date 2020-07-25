@@ -24,6 +24,7 @@
 #include <QVBoxLayout>
 
 #include "Core/Core.h"
+#include "Core/ConfigManager.h"
 
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 #include "DolphinQt/Config/Mapping/MappingIndicator.h"
@@ -34,6 +35,7 @@
 
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControlReference/ExpressionParser.h"
+#include "InputCommon/ControlReference/FunctionExpression.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
@@ -94,8 +96,9 @@ QTextCharFormat GetCommentCharFormat()
 }  // namespace
 
 ControlExpressionSyntaxHighlighter::ControlExpressionSyntaxHighlighter(QTextDocument* parent,
-                                                                       QLineEdit* result)
-    : QSyntaxHighlighter(parent), m_result_text(result)
+                                                                       QLineEdit* result,
+                                                                       bool is_input)
+    : QSyntaxHighlighter(parent), m_result_text(result), m_is_input(is_input)
 {
 }
 
@@ -186,6 +189,37 @@ void ControlExpressionSyntaxHighlighter::highlightBlock(const QString&)
       set_block_format(int(token.string_position), int(token.string_length),
                        GetInvalidCharFormat());
     }
+    else
+    {
+      std::string appended_flags = "";
+      // Show what kind of focus the epression wants if it's not the default, expected one.
+      // This information won't be used if the user doesn't block background input.
+      // This isn't able to read from actual input expressions as they haven't been initialized,
+      // but it reads from any other expression. Also, some InputReference types ignore focus
+      if (parse_status.expr)
+      {
+        Device::FocusFlags focus_flags = parse_status.expr->GetFocusFlags();
+        if (focus_flags != Device::FocusFlags::Default)
+        {
+          if (!m_is_input)
+          {
+            appended_flags = _trans(" Focus Settings ignored.");
+          }
+          // Flags in order of priority (don't report "errors" for mutually exclusive ones)
+          else if (u8(focus_flags) & u8(Device::FocusFlags::IgnoreFocus))
+          {
+            appended_flags = _trans(" Ignores Focus.");
+          }
+          else if ((u8(focus_flags) & u8(Device::FocusFlags::RequireFullFocus)) &&
+                   SConfig::GetInstance().bLockCursor)
+          {
+            appended_flags = _trans(" Requires Full Focus.");
+          }
+        }
+      }
+      
+      m_result_text->setText(m_result_text->text() + QString::fromStdString(appended_flags));
+    }
   }
 }
 
@@ -209,7 +243,13 @@ IOWindow::IOWindow(MappingWidget* parent, ControllerEmu::EmulatedController* con
 
   connect(parent, &MappingWidget::Update, this, &IOWindow::Update);
 
-  setWindowTitle(type == IOWindow::Type::Input ? tr("Configure Input") : tr("Configure Output"));
+  // TODO: it would be nice to have the name of the input in the window
+  // (control->ui_name from MappingWidget.cpp)
+  QString title =
+      m_type == IOWindow::Type::Output ?
+          tr("Configure Output") :
+          (m_type == IOWindow::Type::Input ? tr("Configure Input") : tr("Configure Input Setting"));
+  setWindowTitle(title);
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
   ConfigChanged();
@@ -242,12 +282,12 @@ void IOWindow::CreateMainLayout()
 
   m_expression_text = new QPlainTextEdit();
   m_expression_text->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-  new ControlExpressionSyntaxHighlighter(m_expression_text->document(), m_parse_text);
+  new ControlExpressionSyntaxHighlighter(m_expression_text->document(), m_parse_text, m_type == Type::Input);
 
   m_operators_combo = new QComboBox();
   m_operators_combo->addItem(tr("Operators"));
   m_operators_combo->insertSeparator(1);
-  if (m_type == Type::Input)
+  if (m_type == Type::Input || m_type == Type::InputSetting)
   {
     m_operators_combo->addItem(tr("! Not"));
     m_operators_combo->addItem(tr("* Multiply"));
@@ -261,43 +301,73 @@ void IOWindow::CreateMainLayout()
     m_operators_combo->addItem(tr("^ Xor"));
   }
   m_operators_combo->addItem(tr("| Or"));
-  if (m_type == Type::Input)
+  if (m_type == Type::Input || m_type == Type::InputSetting)
   {
     m_operators_combo->addItem(tr(", Comma"));
   }
 
   m_functions_combo = new QComboBox(this);
   m_functions_combo->addItem(tr("Functions"));
-  m_functions_combo->insertSeparator(1);
-  m_functions_combo->addItem(QStringLiteral("if"));
-  m_functions_combo->addItem(QStringLiteral("timer"));
-  m_functions_combo->addItem(QStringLiteral("toggle"));
-  m_functions_combo->addItem(QStringLiteral("deadzone"));
-  m_functions_combo->addItem(QStringLiteral("smooth"));
-  m_functions_combo->addItem(QStringLiteral("hold"));
-  m_functions_combo->addItem(QStringLiteral("tap"));
-  m_functions_combo->addItem(QStringLiteral("relative"));
-  m_functions_combo->addItem(QStringLiteral("pulse"));
+  m_functions_combo->insertSeparator(m_functions_combo->count());  // A separator is also an item
+  m_functions_parameters.push_back(QStringLiteral(""));            // Keep them aligned
+  // Logic/Math:
+  AddFunction("if");
+  AddFunction("not");
+  AddFunction("min");
+  AddFunction("max");
+  AddFunction("pow");
+  AddFunction("sin");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // State/time based:
+  AddFunction("onPress");
+  AddFunction("onRelease");
+  AddFunction("onChange");
+  AddFunction("cache");
+  AddFunction("hold");
+  AddFunction("toggle");
+  AddFunction("tap");
+  AddFunction("relative");
+  AddFunction("smooth");
+  AddFunction("pulse");
+  AddFunction("timer");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // Stick helpers:
+  AddFunction("deadzone");
+  AddFunction("antiDeadzone");
+  AddFunction("bezierCurve");
+  AddFunction("antiAcceleration");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // Meta:
+  AddFunction("getGameSpeed");
+  AddFunction("hasFocus");
+  AddFunction("setIgnoreFocus");
+  AddFunction("setIgnoreOnFocusChange");
 
   // Devices
   m_main_layout->addWidget(m_devices_combo);
 
   // Range
   auto* range_hbox = new QHBoxLayout();
-  range_hbox->addWidget(new QLabel(tr("Range")));
+  range_hbox->addWidget(new QLabel(tr("Range (%)")));
   range_hbox->addWidget(m_range_slider);
   range_hbox->addWidget(m_range_spinbox);
   m_range_slider->setMinimum(-500);
   m_range_slider->setMaximum(500);
   m_range_spinbox->setMinimum(-500);
   m_range_spinbox->setMaximum(500);
-  m_main_layout->addLayout(range_hbox);
+  // If this is an input setting, the range won't be saved in our config,
+  // nor it would make sense to change it, so just hide it
+  if (m_type != Type::InputSetting)
+    m_main_layout->addLayout(range_hbox);
 
   // Options (Buttons, Outputs) and action buttons
 
   m_option_list->setTabKeyNavigation(false);
 
-  if (m_type == Type::Input)
+  if (m_type == Type::Input || m_type == Type::InputSetting)
   {
     m_option_list->setColumnCount(2);
     m_option_list->setColumnWidth(1, 64);
@@ -326,7 +396,7 @@ void IOWindow::CreateMainLayout()
 
   button_vbox->addWidget(m_select_button);
 
-  if (m_type == Type::Input)
+  if (m_type == Type::Input || m_type == Type::InputSetting)
   {
     m_test_button->hide();
     button_vbox->addWidget(m_detect_button);
@@ -339,7 +409,7 @@ void IOWindow::CreateMainLayout()
 
   button_vbox->addWidget(m_operators_combo);
 
-  if (m_type == Type::Input)
+  if (m_type == Type::Input || m_type == Type::InputSetting)
     button_vbox->addWidget(m_functions_combo);
   else
     m_functions_combo->hide();
@@ -355,6 +425,58 @@ void IOWindow::CreateMainLayout()
   m_button_box->addButton(QDialogButtonBox::Ok);
 
   setLayout(m_main_layout);
+}
+
+void IOWindow::AddFunction(std::string function_name)
+{
+  using namespace ciface::ExpressionParser;
+  // Try to instantiate the function by name
+  std::unique_ptr<FunctionExpression> func = MakeFunctionExpression(function_name);
+
+  // Don't do anything if the function doesn't exist
+  if (func.get() == nullptr)
+  {
+    return;
+  }
+
+  m_functions_combo->addItem(QString::fromStdString(function_name));
+
+  // Try to set the function arguments, which will return a corrected version
+  // if they are not valid
+  std::vector<std::unique_ptr<Expression>> fake_args;
+  const auto argument_validation = func->SetArguments(std::move(fake_args));
+
+  // If the fake empty arguments are invalid, pre-fill commas between them.
+  // We don't add the argument names themselves because names are always parsed correctly,
+  // so the expression would be accepted. Also, errors are visible at the bottom of the widget
+  if (std::holds_alternative<FunctionExpression::ExpectedArguments>(argument_validation))
+  {
+    std::string correct_args =
+        std::get<FunctionExpression::ExpectedArguments>(argument_validation).text;
+
+    int commas_num = std::count(correct_args.begin(), correct_args.end(), ',');
+    int brackets_num = std::count(correct_args.begin(), correct_args.end(), '[');
+    int equals_num = std::count(correct_args.begin(), correct_args.end(), '=');
+
+    // Arguments that either have brackets or equal are not mandatory.
+    // As an alternative we should just pass in an increasing number of argments,
+    // and see the first number that gets accepted
+    commas_num -= brackets_num;
+    commas_num -= equals_num;
+
+    std::string commas = "";
+    while (commas_num > 0)
+    {
+      commas += ",";
+      --commas_num;
+    }
+    
+    m_functions_parameters.push_back(QString::fromStdString(commas));
+  }
+  else
+  {
+    m_functions_parameters.push_back(QStringLiteral(""));
+  }
 }
 
 void IOWindow::ConfigChanged()
@@ -388,6 +510,7 @@ void IOWindow::ConnectWidgets()
   connect(m_devices_combo, &QComboBox::currentTextChanged, this, &IOWindow::OnDeviceChanged);
   connect(m_range_spinbox, qOverload<int>(&QSpinBox::valueChanged), this,
           &IOWindow::OnRangeChanged);
+  connect(m_range_slider, &QSlider::valueChanged, this, &IOWindow::OnRangeChanged);
 
   connect(m_expression_text, &QPlainTextEdit::textChanged, [this] {
     m_apply_button->setText(m_apply_button->text().remove(QStringLiteral("*")));
@@ -404,10 +527,11 @@ void IOWindow::ConnectWidgets()
   });
 
   connect(m_functions_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
-    if (0 == index)
+    if (0 == index || 1 == index)
       return;
 
-    m_expression_text->insertPlainText(m_functions_combo->currentText() + QStringLiteral("()"));
+    m_expression_text->insertPlainText(m_functions_combo->currentText() + QStringLiteral("(") +
+                                       m_functions_parameters[index - 1] + QStringLiteral(")"));
 
     m_functions_combo->setCurrentIndex(0);
   });

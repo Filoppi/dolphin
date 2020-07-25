@@ -37,6 +37,11 @@
 #include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoConfig.h"
 
+#ifdef _WIN32
+#include <windef.h>
+#include <WinUser.h>
+#endif
+
 RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
 {
   setWindowTitle(QStringLiteral("Dolphin"));
@@ -81,7 +86,10 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
 
   connect(&Settings::Instance(), &Settings::HideCursorChanged, this,
           &RenderWidget::OnHideCursorChanged);
+  connect(&Settings::Instance(), &Settings::LockCursorChanged, this,
+          &RenderWidget::OnLockCursorChanged);
   OnHideCursorChanged();
+  OnLockCursorChanged();
   connect(&Settings::Instance(), &Settings::KeepWindowOnTopChanged, this,
           &RenderWidget::OnKeepOnTopChanged);
   OnKeepOnTopChanged(Settings::Instance().IsKeepWindowOnTopEnabled());
@@ -130,7 +138,33 @@ void RenderWidget::dropEvent(QDropEvent* event)
 
 void RenderWidget::OnHideCursorChanged()
 {
-  setCursor(Settings::Instance().GetHideCursor() ? Qt::BlankCursor : Qt::ArrowCursor);
+  UpdateCursor();
+}
+void RenderWidget::OnLockCursorChanged()
+{
+  SetCursorLocked(false);
+  UpdateCursor();
+}
+
+// Calling this at any time will set the cursor (image) to the correst state
+void RenderWidget::UpdateCursor()
+{
+  if (!Settings::Instance().GetLockCursor())
+  {
+    // Only hide if the cursor is automatically locking (it will hide on lock).
+    // "Unhide" the cursor if we lost focus, otherwise it will disappear when hovering
+    // on top of the game window in the background
+    bool keep_on_top = (windowFlags() & Qt::WindowStaysOnTopHint) != 0;
+    bool should_hide =
+        Settings::Instance().GetHideCursor() &&
+        (keep_on_top || SConfig::GetInstance().m_BackgroundInput || isActiveWindow());
+    setCursor(should_hide ? Qt::BlankCursor : Qt::ArrowCursor);
+  }
+  else
+  {
+    setCursor((m_cursor_locked && Settings::Instance().GetHideCursor()) ? Qt::BlankCursor :
+                                                                          Qt::ArrowCursor);
+  }
 }
 
 void RenderWidget::OnKeepOnTopChanged(bool top)
@@ -140,14 +174,22 @@ void RenderWidget::OnKeepOnTopChanged(bool top)
   setWindowFlags(top ? windowFlags() | Qt::WindowStaysOnTopHint :
                        windowFlags() & ~Qt::WindowStaysOnTopHint);
 
+  m_dont_lock_cursor_on_show = true;
   if (was_visible)
     show();
+  m_dont_lock_cursor_on_show = false;
+
+  UpdateCursor();
 }
 
 void RenderWidget::HandleCursorTimer()
 {
-  if (isActiveWindow())
+  if (!isActiveWindow())
+    return;
+  if (!Settings::Instance().GetLockCursor() || m_cursor_locked)
+  {
     setCursor(Qt::BlankCursor);
+  }
 }
 
 void RenderWidget::showFullScreen()
@@ -159,6 +201,75 @@ void RenderWidget::showFullScreen()
   const auto dpr = screen->devicePixelRatio();
 
   emit SizeChanged(width() * dpr, height() * dpr);
+}
+
+// Lock the cursor within the window internal borders
+void RenderWidget::SetCursorLocked(bool locked)
+{
+  if (locked)
+  {
+#ifdef _WIN32
+    RECT rect;
+    rect.left = geometry().left();
+    rect.right = geometry().right();
+    rect.top = geometry().top();
+    rect.bottom = geometry().bottom();
+
+    if (ClipCursor(&rect))
+#else
+    // TODO: implement on other platforms. Probably XGrabPointer on Linux.
+    // The setting is hidden in QT if not implemented
+    if (false)
+#endif
+    {
+      m_cursor_locked = true;
+
+      if (Settings::Instance().GetHideCursor())
+      {
+        setCursor(Qt::BlankCursor);
+      }
+
+      Host::GetInstance()->SetRenderFullFocus(true);
+    }
+  }
+  else
+  {
+#ifdef _WIN32
+    ClipCursor(nullptr);
+#endif
+
+    if (m_cursor_locked)
+    {
+      m_cursor_locked = false;
+
+      if (!Settings::Instance().GetLockCursor())
+      {
+        return;
+      }
+
+      // Center the mouse in the window if it's still active
+      if (isActiveWindow())
+      {
+        cursor().setPos(geometry().left() + geometry().width() / 2,
+                        geometry().top() + geometry().height() / 2);
+      }
+
+      // Show the cursor or the user won't know the mouse is now unlocked
+      setCursor(Qt::ArrowCursor);
+
+      Host::GetInstance()->SetRenderFullFocus(false);
+    }
+  }
+}
+
+void RenderWidget::SetCursorLockedOnNextActivation(bool locked)
+{
+  if (Settings::Instance().GetLockCursor())
+  {
+    m_lock_cursor_on_next_activation = locked;
+    return;
+  }
+  m_lock_cursor_on_next_activation = false;
 }
 
 bool RenderWidget::event(QEvent* event)
@@ -180,35 +291,82 @@ bool RenderWidget::event(QEvent* event)
 
     break;
   }
+  // Needed in case a new window open and it moves the mouse
+  case QEvent::WindowBlocked:
+    SetCursorLocked(false);
+    break;
   case QEvent::MouseMove:
     if (g_Config.bFreeLook)
       OnFreeLookMouseMove(static_cast<QMouseEvent*>(event));
     [[fallthrough]];
 
   case QEvent::MouseButtonPress:
-    if (!Settings::Instance().GetHideCursor() && isActiveWindow())
+    if (isActiveWindow())
     {
-      setCursor(Qt::ArrowCursor);
-      m_mouse_timer->start(MOUSE_HIDE_DELAY);
+      // Lock the cursor with any mouse button click (behave the same as window focus change).
+      // This event is occasionally missed because isActiveWindow is laggy
+      if (Settings::Instance().GetLockCursor() && event->type() == QEvent::MouseButtonPress)
+      {
+          SetCursorLocked(true);
+      }
+      // Unhide on movement
+      if (!Settings::Instance().GetHideCursor())
+      {
+        setCursor(Qt::ArrowCursor);
+        m_mouse_timer->start(MOUSE_HIDE_DELAY);
+      }
     }
     break;
   case QEvent::WinIdChange:
     emit HandleChanged(reinterpret_cast<void*>(winId()));
     break;
+  case QEvent::Show:
+    // Don't do if "stay on top" changed (or was true)
+    if (Settings::Instance().GetLockCursor() && Settings::Instance().GetHideCursor() &&
+        !m_dont_lock_cursor_on_show)
+    {
+      // Auto lock when this window is shown (it was hidden)
+      if (isActiveWindow())
+        SetCursorLocked(true);
+      else
+        SetCursorLockedOnNextActivation();
+    }
+    break;
+  // Note that this event in Windows is not always aligned to the window that is highlighted,
+  // it's the window that has keyboard and mouse focus
   case QEvent::WindowActivate:
     if (SConfig::GetInstance().m_PauseOnFocusLost && Core::GetState() == Core::State::Paused)
       Core::SetState(Core::State::Running);
 
+    UpdateCursor();
+
+    if (m_lock_cursor_on_next_activation)
+    {
+      if (Settings::Instance().GetLockCursor())
+        SetCursorLocked(true);
+
+      m_lock_cursor_on_next_activation = false;
+    }
+
     emit FocusChanged(true);
     break;
   case QEvent::WindowDeactivate:
+    SetCursorLocked(false);
+
+    UpdateCursor();
+
     if (SConfig::GetInstance().m_PauseOnFocusLost && Core::GetState() == Core::State::Running)
       Core::SetState(Core::State::Paused);
 
     emit FocusChanged(false);
     break;
+  case QEvent::Move:
+    SetCursorLocked(m_cursor_locked);
+    break;
   case QEvent::Resize:
   {
+    SetCursorLocked(m_cursor_locked);
+
     const QResizeEvent* se = static_cast<QResizeEvent*>(event);
     QSize new_size = se->size();
 
@@ -220,6 +378,8 @@ bool RenderWidget::event(QEvent* event)
     break;
   }
   case QEvent::WindowStateChange:
+    // Lock the mouse again when fullscreen changes (we might have missed some events)
+    SetCursorLocked(m_cursor_locked || (isFullScreen() && Settings::Instance().GetLockCursor()));
     emit StateChanged(isFullScreen());
     break;
   case QEvent::Close:

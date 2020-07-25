@@ -65,6 +65,11 @@ bool Host::GetRenderFocus()
   return m_render_focus;
 }
 
+bool Host::GetRenderFullFocus()
+{
+  return m_render_full_focus;
+}
+
 void Host::SetRenderFocus(bool focus)
 {
   m_render_focus = focus;
@@ -73,6 +78,11 @@ void Host::SetRenderFocus(bool focus)
       if (!Config::Get(Config::MAIN_RENDER_TO_MAIN))
         g_renderer->SetFullscreen(focus);
     });
+}
+
+void Host::SetRenderFullFocus(bool focus)
+{
+  m_render_full_focus = focus;
 }
 
 bool Host::GetRenderFullscreen()
@@ -119,6 +129,11 @@ bool Host_RendererHasFocus()
   return Host::GetInstance()->GetRenderFocus();
 }
 
+bool Host_RendererHasFullFocus()
+{
+  return Host::GetInstance()->GetRenderFullFocus();
+}
+
 bool Host_RendererIsFullscreen()
 {
   return Host::GetInstance()->GetRenderFullscreen();
@@ -158,6 +173,7 @@ void Host_RequestRenderWindowSize(int w, int h)
 
 bool Host_UIBlocksControllerState()
 {
+  // TODO: shouldn't this call WantCaptureKeyboard and "controller" as well?
   return ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard;
 }
 

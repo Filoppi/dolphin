@@ -14,6 +14,7 @@
 #include "Common/Common.h"
 #include "Common/StringUtil.h"
 
+#include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControlReference/ExpressionParser.h"
 #include "InputCommon/ControlReference/FunctionExpression.h"
 
@@ -215,6 +216,10 @@ public:
       output->SetState(value);
   }
   int CountNumControls() const override { return (input || output) ? 1 : 0; }
+  Device::FocusFlags GetFocusFlags() const override
+  {
+    return input ? input->GetFocusFlags() : Device::FocusFlags::Default;
+  }
   void UpdateReferences(ControlEnvironment& env) override
   {
     m_device = env.FindDevice(qualifier);
@@ -305,6 +310,11 @@ public:
     return lhs->CountNumControls() + rhs->CountNumControls();
   }
 
+  Device::FocusFlags GetFocusFlags() const override
+  {
+    return Device::FocusFlags(u8(lhs->GetFocusFlags()) | u8(rhs->GetFocusFlags()));
+  }
+
   void UpdateReferences(ControlEnvironment& env) override
   {
     lhs->UpdateReferences(env);
@@ -388,6 +398,7 @@ public:
   void SetValue(ControlState value) override { GetActiveChild()->SetValue(value); }
 
   int CountNumControls() const override { return GetActiveChild()->CountNumControls(); }
+  Device::FocusFlags GetFocusFlags() const override { return GetActiveChild()->GetFocusFlags(); }
   void UpdateReferences(ControlEnvironment& env) override
   {
     m_lhs->UpdateReferences(env);

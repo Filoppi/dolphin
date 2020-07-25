@@ -13,7 +13,7 @@ Here is a nice ascii overview of audio flow affected by this file:
 (DVD)---->[Drive I/F]---->[SRC]---->[Counter]
 
 Notes:
-Output at "48KHz" is actually 48043Hz.
+Output at "48KHz" is actually ~48043Hz on GC.
 Sample counter counts streaming stereo samples after upsampling.
 [DAC] causes [AI I/F] to read from RAM at rate selected by AIDFR.
 Each [SRC] will upsample a 32KHz source, or pass through the 48KHz
@@ -113,8 +113,8 @@ static u32 s_interrupt_timing = 0;
 static u64 s_last_cpu_time = 0;
 static u64 s_cpu_cycles_per_sample = 0xFFFFFFFFFFFULL;
 
-static u32 s_ais_sample_rate = 48000;
-static u32 s_aid_sample_rate = 32000;
+static double s_ais_sample_rate = 48000.0;
+static double s_aid_sample_rate = 32000.0;
 
 void DoState(PointerWrap& p)
 {
@@ -149,8 +149,8 @@ void Init()
   s_last_cpu_time = 0;
   s_cpu_cycles_per_sample = 0xFFFFFFFFFFFULL;
 
-  s_ais_sample_rate = 48000;
-  s_aid_sample_rate = 32000;
+  s_ais_sample_rate = 48000.0;
+  s_aid_sample_rate = 32000.0;
 
   event_type_ai = CoreTiming::RegisterEvent("AICallback", Update);
 }
@@ -178,17 +178,18 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
           s_control.AIINTVLD = tmp_ai_ctrl.AIINTVLD;
         }
 
-        // Set frequency of streaming audio
+        // Set frequency of streaming (DVD) audio
         if (tmp_ai_ctrl.AISFR != s_control.AISFR)
         {
           // AISFR rates below are intentionally inverted wrt yagcd
           DEBUG_LOG(AUDIO_INTERFACE, "Change AISFR to %s", tmp_ai_ctrl.AISFR ? "48khz" : "32khz");
           s_control.AISFR = tmp_ai_ctrl.AISFR;
           if (SConfig::GetInstance().bWii)
-            s_ais_sample_rate = tmp_ai_ctrl.AISFR ? 48000 : 32000;
+            s_ais_sample_rate = tmp_ai_ctrl.AISFR ? 48000.0 : 32000.0;
           else
-            s_ais_sample_rate = tmp_ai_ctrl.AISFR ? 48043 : 32029;
-          g_sound_stream->GetMixer()->SetStreamInputSampleRate(s_ais_sample_rate);
+            s_ais_sample_rate =
+                (tmp_ai_ctrl.AISFR ? (54000000.0) : (36000000.0)) / 1124.0;  //~48043 and ~32029
+          g_sound_stream->GetMixer()->SetStreamingInputSampleRate(s_ais_sample_rate);
           s_cpu_cycles_per_sample = SystemTimers::GetTicksPerSecond() / s_ais_sample_rate;
         }
         // Set frequency of DMA
@@ -197,9 +198,10 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
           DEBUG_LOG(AUDIO_INTERFACE, "Change AIDFR to %s", tmp_ai_ctrl.AIDFR ? "32khz" : "48khz");
           s_control.AIDFR = tmp_ai_ctrl.AIDFR;
           if (SConfig::GetInstance().bWii)
-            s_aid_sample_rate = tmp_ai_ctrl.AIDFR ? 32000 : 48000;
+            s_aid_sample_rate = tmp_ai_ctrl.AIDFR ? 32000.0 : 48000.0;
           else
-            s_aid_sample_rate = tmp_ai_ctrl.AIDFR ? 32029 : 48043;
+            s_aid_sample_rate =
+                (tmp_ai_ctrl.AIDFR ? (36000000.0) : (54000000.0)) / 1124.0;  //~32029 and ~48043
           g_sound_stream->GetMixer()->SetDMAInputSampleRate(s_aid_sample_rate);
         }
 
@@ -299,9 +301,13 @@ bool IsPlaying()
   return (s_control.PSTAT == 1);
 }
 
-unsigned int GetAIDSampleRate()
+double GetAIDSampleRate()
 {
   return s_aid_sample_rate;
+}
+double GetAISSampleRate()
+{
+  return s_ais_sample_rate;
 }
 
 static void Update(u64 userdata, s64 cycles_late)
@@ -309,9 +315,10 @@ static void Update(u64 userdata, s64 cycles_late)
   if (s_control.PSTAT)
   {
     const u64 diff = CoreTiming::GetTicks() - s_last_cpu_time;
-    if (diff > s_cpu_cycles_per_sample)
+    if (diff >= s_cpu_cycles_per_sample)
     {
       const u32 samples = static_cast<u32>(diff / s_cpu_cycles_per_sample);
+      // We re-multiply samples by s_cpu_cycles_per_sample to account for imprecisions
       s_last_cpu_time += samples * s_cpu_cycles_per_sample;
       IncreaseSampleCount(samples);
     }

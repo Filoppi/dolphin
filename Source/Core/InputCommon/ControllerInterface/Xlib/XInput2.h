@@ -52,6 +52,11 @@ private:
     std::string GetName() const override { return name; }
     Button(unsigned int index, unsigned int* buttons);
     ControlState GetState() const override;
+    Flags GetFlags() const override
+    {
+      return (Flags)((u8)Flags::RequiresFocus | (u8)Flags::RequiresFullFocus |
+                     (u8)Flags::IgnoreOnFocusAcquired);
+    }
 
   private:
     const unsigned int* m_buttons;
@@ -66,6 +71,10 @@ private:
     bool IsDetectable() const override { return false; }
     Cursor(u8 index, bool positive, const float* cursor);
     ControlState GetState() const override;
+    Flags GetFlags() const override
+    {
+      return (Flags)((u8)Flags::RequiresFocus | (u8)Flags::RequiresFullFocus);
+    }
 
   private:
     const float* m_cursor;
@@ -81,6 +90,10 @@ private:
     bool IsDetectable() const override { return false; }
     Axis(u8 index, bool positive, const float* axis);
     ControlState GetState() const override;
+    Flags GetFlags() const override
+    {
+      return (Flags)((u8)Flags::RequiresFocus | (u8)Flags::RequiresFullFocus);
+    }
 
   private:
     const float* m_axis;

@@ -34,13 +34,14 @@ class ControlExpressionSyntaxHighlighter final : public QSyntaxHighlighter
 {
   Q_OBJECT
 public:
-  ControlExpressionSyntaxHighlighter(QTextDocument* parent, QLineEdit* result);
+  ControlExpressionSyntaxHighlighter(QTextDocument* parent, QLineEdit* result, bool is_input);
 
 protected:
   void highlightBlock(const QString& text) final override;
 
 private:
   QLineEdit* const m_result_text;
+  bool m_is_input;
 };
 
 class IOWindow final : public QDialog
@@ -50,6 +51,7 @@ public:
   enum class Type
   {
     Input,
+    InputSetting,
     Output
   };
 
@@ -60,6 +62,7 @@ public:
 
 private:
   void CreateMainLayout();
+  void AddFunction(std::string function_name);
   void ConnectWidgets();
   void ConfigChanged();
   void Update();
@@ -94,6 +97,7 @@ private:
   // Input actions
   QPushButton* m_detect_button;
   QComboBox* m_functions_combo;
+  std::vector<QString> m_functions_parameters;
 
   // Output actions
   QPushButton* m_test_button;

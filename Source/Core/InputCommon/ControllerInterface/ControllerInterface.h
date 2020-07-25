@@ -51,7 +51,7 @@ public:
   void AddDevice(std::shared_ptr<ciface::Core::Device> device);
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
   bool IsInit() const { return m_is_init; }
-  void UpdateInput();
+  void UpdateInput(bool update_mouse_axis = false);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
   // Used to fit mouse cursor inputs to the relevant region of the render window.
@@ -65,6 +65,8 @@ public:
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
 
+  bool ShouldUpdateMouseAxis() const { return should_update_mouse_axis; }
+
 private:
   std::list<std::function<void()>> m_devices_changed_callbacks;
   mutable std::mutex m_callbacks_mutex;
@@ -72,6 +74,7 @@ private:
   std::atomic<bool> m_is_populating_devices{false};
   WindowSystemInfo m_wsi;
   std::atomic<float> m_aspect_ratio_adjustment = 1;
+  bool should_update_mouse_axis = false;
 };
 
 extern ControllerInterface g_controller_interface;

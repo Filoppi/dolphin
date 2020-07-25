@@ -212,7 +212,7 @@ IPCCommandResult USB_KBD::Write(const ReadWriteRequest& request)
 IPCCommandResult USB_KBD::IOCtl(const IOCtlRequest& request)
 {
   if (SConfig::GetInstance().m_WiiKeyboard && !Core::WantsDeterminism() &&
-      ControlReference::GetInputGate() && !m_message_queue.empty())
+      InputReference::GetInputGate() && !m_message_queue.empty())
   {
     Memory::CopyToEmu(request.buffer_out, &m_message_queue.front(), sizeof(MessageData));
     m_message_queue.pop();

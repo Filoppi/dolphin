@@ -34,6 +34,7 @@ enum class HostMessageID
 
 bool Host_UIBlocksControllerState();
 bool Host_RendererHasFocus();
+bool Host_RendererHasFullFocus();
 bool Host_RendererIsFullscreen();
 void Host_Message(HostMessageID id);
 void Host_NotifyMapLoaded();
