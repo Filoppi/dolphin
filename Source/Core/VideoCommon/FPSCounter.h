@@ -18,6 +18,7 @@ public:
   void Update();
 
   float GetFPS() const { return m_fps; }
+  double GetDeltaTime() { return m_time_diff_secs; }
 
 private:
   void SetPaused(bool paused);
@@ -29,6 +30,7 @@ private:
   int m_on_state_changed_handle = -1;
   float m_fps = 0.f;
   std::ofstream m_bench_file;
+  double m_time_diff_secs = 0.0;
 
   void LogRenderTimeToFile(u64 val);
 };

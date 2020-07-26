@@ -44,8 +44,9 @@ void FPSCounter::LogRenderTimeToFile(u64 val)
 
 void FPSCounter::Update()
 {
-  u64 time = Common::Timer::GetTimeUs();
-  u64 diff = time - m_last_time;
+  const u64 time = Common::Timer::GetTimeUs();
+  const u64 diff = time - m_last_time;
+  m_time_diff_secs = static_cast<double>(diff / 1000000.0);
   if (g_ActiveConfig.bLogRenderTimeToFile)
     LogRenderTimeToFile(diff);
 

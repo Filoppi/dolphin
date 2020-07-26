@@ -214,7 +214,7 @@ class AntiDeadzoneExpression : public FunctionExpression
   {
     const ControlState val = GetArg(0).GetValue();
     const ControlState anti_deadzone = GetArg(1).GetValue();
-    // Fixes the problem where 2 oppositve axis have the same anti deadzone
+    // Fixes the problem where 2 opposite axis have the same anti deadzone
     // so they would cancel each other out if we didn't check for this
     if (val == 0.0)
     {
@@ -267,7 +267,7 @@ class BezierCurveExpression : public FunctionExpression
 // to gradually accelerate its response with time. It should help in
 // keeping a response curve closer to 1:1 (linear).
 // The way this work is by "predicting" the acceleration the game would have with time,
-// and incrasing the input value so you won't feel any acceleration,
+// and increasing the input value so you won't feel any acceleration,
 // the drawback is that you might see some velocity snapping, and this doesn't
 // work when passing in a maxed out input of course.
 // An alternative approach would be to actually try to shrink the input as time passed,
@@ -318,8 +318,15 @@ class AntiAccelerationExpression : public FunctionExpression
     const ControlState multiplier = MathUtil::Lerp(1.0, acc * acc_alpha, time_alpha * time_alpha);
 
     const auto now = Clock::now();
-    // This should be multiplied by the actual emulation speed of course but it can't here
-    m_elapsed += std::chrono::duration_cast<FSec>(now - m_last_update).count();
+    if (abs_val >= min_time_input)
+    {
+      // This should be multiplied by the actual emulation speed of course but it can't here
+      m_elapsed += std::chrono::duration_cast<FSec>(now - m_last_update).count();
+    }
+    else
+    {
+      m_elapsed = 0.0;
+    }
     m_last_update = now;
 
     return std::copysign(abs_val * multiplier, val);
@@ -821,8 +828,7 @@ class GetGameSpeedExpression : public FunctionExpression
       return ExpectedArguments{"none"};
   }
 
-  ControlState GetValue() const override { return 1.0; }
-  //To re-implement: ControlState GetValue() const override { return ::Core::GetActualEmulationSpeed(); }
+  ControlState GetValue() const override { return ::Core::GetActualEmulationSpeed(); }
 };
 
 // usage: (return value)hasFocus()

@@ -25,7 +25,10 @@ namespace Core
 bool GetIsThrottlerTempDisabled();
 void SetIsThrottlerTempDisabled(bool disable);
 
-void Callback_FramePresented();
+// Returns the latest emulation speed (1 is full speed) (swings a lot)
+double GetActualEmulationSpeed();
+
+void Callback_FramePresented(double actual_emulation_speed = 1.0);
 void Callback_NewField();
 
 enum class State

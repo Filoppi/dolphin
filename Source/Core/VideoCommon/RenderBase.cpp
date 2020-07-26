@@ -1192,7 +1192,7 @@ void Renderer::UpdateWidescreenHeuristic()
     // with NON-anamorphic orthographic projections.
     // This can cause incorrect changes to 4:3 when perspective projections are temporarily not
     // shown. e.g. Animal Crossing's inventory menu.
-    // Unless we were in a sitation which was orthographically anamorphic
+    // Unless we were in a situation which was orthographically anamorphic
     // we won't consider orthographic data for changes from 16:9 to 4:3.
     m_is_game_widescreen = false;
   }
@@ -1319,11 +1319,12 @@ void Renderer::Swap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height, u6
       {
         // Remove stale EFB/XFB copies.
         g_texture_cache->Cleanup(m_frame_count);
-        //double LastSpeed = 1.0 / (m_fps_counter.GetDeltaTime() * VideoInterface::GetTargetRefreshRate()); //To do...
-        Core::Callback_FramePresented();
+        double LastSpeed =
+            1.0 / (m_fps_counter.GetDeltaTime() * VideoInterface::GetTargetRefreshRate());
+        Core::Callback_FramePresented(LastSpeed);
       }
 
-      // Handle any config changes, this gets propogated to the backend.
+      // Handle any config changes, this gets propagated to the backend.
       CheckForConfigChanges();
       g_Config.iSaveTargetId = 0;
 

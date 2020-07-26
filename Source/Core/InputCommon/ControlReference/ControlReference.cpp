@@ -4,6 +4,8 @@
 
 #include "InputCommon/ControlReference/ControlReference.h"
 
+#include <algorithm>
+
 #include "Core/Host.h"
 
 using namespace ciface::ExpressionParser;
@@ -99,8 +101,8 @@ void ControlReference::SetExpression(std::string expr)
 }
 
 ControlReference::ControlReference()
-    : range(1.0), default_range(1.0), m_parse_status(ParseStatus::EmptyExpression),
-      m_parsed_expression(nullptr)
+    : range(1.0), default_range(1.0), m_parsed_expression(nullptr),
+      m_parse_status(ParseStatus::EmptyExpression)
 {
 }
 

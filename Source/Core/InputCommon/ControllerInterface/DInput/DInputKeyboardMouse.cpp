@@ -10,11 +10,11 @@
 #include "InputCommon/ControllerInterface/DInput/DInput.h"
 #include "InputCommon/ControllerInterface/DInput/DInputKeyboardMouse.h"
 
-// just a default value which works well at default at 800dpi.
+// Just a default value which works well at default at 800dpi.
 // Users can multiply it anyway (lower is more sensitive)
 #define MOUSE_AXIS_SENSITIVITY 17
 
-// if input hasn't been received for this many ms, mouse input will be skipped
+// If input hasn't been received for this many ms, mouse input will be skipped
 // otherwise it is just some crazy value
 #define DROP_INPUT_TIME 250
 
@@ -36,7 +36,7 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
   if (s_keyboard_mouse_exists)
     return;
 
-  // mouse and keyboard are a combined device, to allow shift+click and stuff
+  // Mouse and keyboard are a combined device, to allow shift+click and stuff
   // if that's dumb, I will make a VirtualDevice class that just uses ranges of inputs/outputs from
   // other devices
   // so there can be a separated Keyboard and Mouse, as well as combined KeyboardMouse.
@@ -44,9 +44,7 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
   LPDIRECTINPUTDEVICE8 kb_device = nullptr;
   LPDIRECTINPUTDEVICE8 mo_device = nullptr;
 
-  // Make sure the SetCooperativeLevel hwnd is valid when we release the device
-  //Otherwise, go back to "void ControllerInterface::RefreshDevices()" and comment it out.
-  //Otherwise see https://bugs.dolphin-emu.org/issues/11702?next_issue_id=11700&prev_issue_id=11704
+  // TODO: Make sure the SetCooperativeLevel hwnd is valid when we release the device
   // These are "virtual" system devices, so they are always there even if we have no physical
   // mouse and keyboard plugged into the computer
   if (SUCCEEDED(idi8->CreateDevice(GUID_SysKeyboard, &kb_device, nullptr)) &&
@@ -153,7 +151,6 @@ void KeyboardMouse::UpdateInput()
 
   UpdateCursorInput();
 
-  //To review: make 2... Leave a high frequency one for the wiimote
   // Only update the mouse axis twice per game video frame, or always if a game is not running.
   // This hack is needed because we use the mouse as a fake analog stick axis.
   // Given that the mouse works with dots (position), all we can get is the number of dots
@@ -161,12 +158,13 @@ void KeyboardMouse::UpdateInput()
   // different parts of Dolphin, not the game itself, so most of the small changes would be lost
   // if we always just returned the very last offset.
   // Another problem in simulating the mouse as an axis is that its speed varies extremely between
-  // frames, differently from an analog stick, this is why we lerp the last 2 values together.
+  // frames, differently from an analog stick, this is why we blend the last 2 values together.
   // If for some reason we needed this axis to be sub-frame accurate while a game is running
   // (e.g. to use it with the emulated wiimote, which runs at a higher tick) we could add yet
-  // another input for that exclusively (e.g. HighRefreshRate Axis+ vs GameRefreshRate Axis+).
+  // another input for that exclusively (e.g. WiiMoteRefreshRate Axis+ vs GameRefreshRate Axis+).
   // Note that we also lerp the Z (wheel) axis
-  if (g_controller_interface.ShouldUpdateMouseAxis() || ::Core::GetState() != ::Core::State::Running)
+  if (g_controller_interface.ShouldUpdateFakeRelativeAxes() ||
+      ::Core::GetState() != ::Core::State::Running)
   {
     DIMOUSESTATE2 tmp_mouse;
 
