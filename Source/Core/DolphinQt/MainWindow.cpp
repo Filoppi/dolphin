@@ -801,9 +801,10 @@ bool MainWindow::RequestStop()
     return true;
   }
 
-  QWidget* confirm_parent = (m_render_widget->isActiveWindow() && !m_render_widget->isFullScreen()) ?
-                               m_render_widget :
-                               static_cast<QWidget*>(this);
+  QWidget* confirm_parent =
+      (m_render_widget->isActiveWindow() && !m_render_widget->isFullScreen()) ?
+          m_render_widget :
+          static_cast<QWidget*>(this);
   bool was_cursor_locked = m_render_widget->IsCursorLocked();
 
   if (!m_render_widget->isFullScreen())

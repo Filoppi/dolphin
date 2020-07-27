@@ -171,10 +171,11 @@ void InterfacePane::CreateInGame()
   m_checkbox_hide_mouse = new QCheckBox(tr("Always Hide Mouse Cursor"));
   m_checkbox_lock_mouse = new QCheckBox(tr("Lock Mouse Cursor"));
 
-  m_checkbox_hide_mouse->setToolTip(
-      tr("Will immediately hide the Mouse Cursor when it hovers on top of the Game Window, otherwise there is a delay.\nIf \"Lock Mouse Cursor\" is enabled, it will hide on Mouse locked"));
-  m_checkbox_lock_mouse->setToolTip(
-      tr("Will lock the Mouse Cursor to the Game Window as long as it has focus. You can set hotkey to unlock it"));
+  m_checkbox_hide_mouse->setToolTip(tr(
+      "Will immediately hide the Mouse Cursor when it hovers on top of the Game Window, otherwise "
+      "there is a delay.\nIf \"Lock Mouse Cursor\" is enabled, it will hide on Mouse locked"));
+  m_checkbox_lock_mouse->setToolTip(tr("Will lock the Mouse Cursor to the Game Window as long as "
+                                       "it has focus. You can set hotkey to unlock it"));
 
   groupbox_layout->addWidget(m_checkbox_top_window);
   groupbox_layout->addWidget(m_checkbox_confirm_on_stop);

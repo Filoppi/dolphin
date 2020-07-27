@@ -91,8 +91,6 @@ void ControllerInterface::ChangeWindow(void* hwnd)
 
 void ControllerInterface::RefreshDevices()
 {
-  //if (true) //To finish
-  //  return;
   if (!m_is_init)
     return;
 

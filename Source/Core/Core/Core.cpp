@@ -1049,7 +1049,7 @@ void QueueHostJob(std::function<void()> job, bool run_during_stop)
   {
     std::lock_guard<std::mutex> guard(s_host_jobs_lock);
     send_message = s_host_jobs_queue.empty();
-    s_host_jobs_queue.emplace(HostJob{ std::move(job), run_during_stop });
+    s_host_jobs_queue.emplace(HostJob{std::move(job), run_during_stop});
   }
   // If the the queue was empty then kick the Host to come and get this job.
   if (send_message)

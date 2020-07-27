@@ -4,9 +4,9 @@
 
 #include "InputCommon/ControlReference/FunctionExpression.h"
 
+#include "Common/MathUtil.h"
 #include "Core/Core.h"
 #include "Core/Host.h"
-#include "Common/MathUtil.h"
 
 #include <algorithm>
 #include <chrono>
@@ -172,7 +172,7 @@ private:
   ControlState GetValue() const override
   {
     return (GetArg(0).GetValue() > CONDITION_THRESHOLD) ? GetArg(1).GetValue() :
-                                                           GetArg(2).GetValue();
+                                                          GetArg(2).GetValue();
   }
 };
 
@@ -808,7 +808,10 @@ class SetIgnoreOnFocusChangeExpression : public FunctionExpression
       return ExpectedArguments{"none"};
   }
 
-  Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreOnFocusChanged; }
+  Device::FocusFlags GetFocusFlags() const override
+  {
+    return Device::FocusFlags::IgnoreOnFocusChanged;
+  }
 
   // This is a "set", has no value
   ControlState GetValue() const override { return 0.0; }

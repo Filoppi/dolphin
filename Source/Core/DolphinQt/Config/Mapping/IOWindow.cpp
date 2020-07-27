@@ -23,8 +23,8 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-#include "Core/Core.h"
 #include "Core/ConfigManager.h"
+#include "Core/Core.h"
 
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 #include "DolphinQt/Config/Mapping/MappingIndicator.h"
@@ -217,7 +217,7 @@ void ControlExpressionSyntaxHighlighter::highlightBlock(const QString&)
           }
         }
       }
-      
+
       m_result_text->setText(m_result_text->text() + QString::fromStdString(appended_flags));
     }
   }
@@ -282,7 +282,8 @@ void IOWindow::CreateMainLayout()
 
   m_expression_text = new QPlainTextEdit();
   m_expression_text->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-  new ControlExpressionSyntaxHighlighter(m_expression_text->document(), m_parse_text, m_type == Type::Input);
+  new ControlExpressionSyntaxHighlighter(m_expression_text->document(), m_parse_text,
+                                         m_type == Type::Input);
 
   m_operators_combo = new QComboBox();
   m_operators_combo->addItem(tr("Operators"));
@@ -470,7 +471,7 @@ void IOWindow::AddFunction(std::string function_name)
       commas += ",";
       --commas_num;
     }
-    
+
     m_functions_parameters.push_back(QString::fromStdString(commas));
   }
   else

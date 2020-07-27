@@ -92,11 +92,12 @@ Cursor::StateData Cursor::GetState(float absolute_time_elapsed, bool is_ui)
   const auto input = GetReshapableState(true);
 
   int i = is_ui ? 1 : 0;
-  
+
   // Kill this after state is moved into wiimote rather than this class.
   const auto now = Clock::now();
   const auto ms_since_update =
-      std::chrono::duration_cast<std::chrono::microseconds>(now - m_last_update[i]).count() / 1000.0;
+      std::chrono::duration_cast<std::chrono::microseconds>(now - m_last_update[i]).count() /
+      1000.0;
   m_last_update[i] = now;
 
   // Relative input:

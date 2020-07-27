@@ -724,10 +724,10 @@ void Wiimote::LoadDefaults(const ControllerInterface& ciface)
   m_dpad->SetControlExpression(2, "LEFT");   // Left
   m_dpad->SetControlExpression(3, "RIGHT");  // Right
 #elif __APPLE__
-  m_dpad->SetControlExpression(0, "`Up Arrow`");              // Up
-  m_dpad->SetControlExpression(1, "`Down Arrow`");            // Down
-  m_dpad->SetControlExpression(2, "`Left Arrow`");            // Left
-  m_dpad->SetControlExpression(3, "`Right Arrow`");           // Right
+  m_dpad->SetControlExpression(0, "`Up Arrow`");            // Up
+  m_dpad->SetControlExpression(1, "`Down Arrow`");          // Down
+  m_dpad->SetControlExpression(2, "`Left Arrow`");          // Left
+  m_dpad->SetControlExpression(3, "`Right Arrow`");         // Right
 #else
   m_dpad->SetControlExpression(0, "Up");     // Up
   m_dpad->SetControlExpression(1, "Down");   // Down

@@ -38,8 +38,8 @@
 #include "VideoCommon/VideoConfig.h"
 
 #ifdef _WIN32
-#include <windef.h>
 #include <WinUser.h>
+#include <windef.h>
 #endif
 
 RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
@@ -307,7 +307,7 @@ bool RenderWidget::event(QEvent* event)
       // This event is occasionally missed because isActiveWindow is laggy
       if (Settings::Instance().GetLockCursor() && event->type() == QEvent::MouseButtonPress)
       {
-          SetCursorLocked(true);
+        SetCursorLocked(true);
       }
       // Unhide on movement
       if (!Settings::Instance().GetHideCursor())

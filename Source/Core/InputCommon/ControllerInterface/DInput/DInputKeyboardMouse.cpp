@@ -141,7 +141,7 @@ void KeyboardMouse::UpdateCursorInput()
 }
 
 void KeyboardMouse::UpdateInput()
-{  
+{
   HRESULT kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
   if (DIERR_INPUTLOST == kb_hr || DIERR_NOTACQUIRED == kb_hr)
   {
