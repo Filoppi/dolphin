@@ -38,10 +38,10 @@
 
 ControllerInterface g_controller_interface;
 
-// We start from InputChannel::HotkeyAndUI on all threads as hotkeys are updated from a worker thread,
+// We start from InputChannel::Host on all threads as hotkeys are updated from a worker thread,
 // but UI can read from the main thread. This will never interfere with game threads
 static thread_local ciface::Core::Device::InputChannel tls_input_channel =
-    ciface::Core::Device::InputChannel::HotkeyAndUI;
+    ciface::Core::Device::InputChannel::Host;
 
 void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 {

@@ -361,7 +361,7 @@ void BluetoothEmu::Update()
 
   if (now - m_last_ticks > interval)
   {
-    g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::BT);
+    g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::Bluetooth);
     for (unsigned int i = 0; i < m_wiimotes.size(); i++)
       Wiimote::Update(i, m_wiimotes[i].IsConnected());
     m_last_ticks = now;

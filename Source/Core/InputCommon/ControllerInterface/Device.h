@@ -97,10 +97,10 @@ public:
   // This should be in ControllerInterface.h but it's here to avoid recursive includes
   enum class InputChannel : u8
   {
-    SI,           // GC Controllers
-    BT,           // WiiMote and other BT devices
-    HotkeyAndUI,  // Hotkeys (worker thread) and UI (game input config panels, main thread)
-    MAX
+    SerialInterface,  // GC Controllers
+    Bluetooth,        // WiiMote and other BT devices
+    Host,             // Hotkeys (worker thread) and UI (game input config panels, main thread)
+    Max
   };
 
   //
@@ -168,20 +168,20 @@ protected:
       u8 i = u8(input_channel);
       // SI updates at twice the video refresh rate of the game, it's very unlikely
       // that games will read both inputs so we average the last two, trade a bit
-      // of latency for accuracy and smoothness. Theoretically this should be per game
-      if (input_channel == InputChannel::SI)
-        return ControlState(m_relative_state[i] - m_prev_relative_state[i]) * 0.5 * m_scale;
+      // of latency for accuracy and smoothness. Theoretically this should be a per game setting
+      if (input_channel == InputChannel::SerialInterface)
+        return (m_relative_state[i] + m_prev_relative_state[i]) * 0.5 * m_scale;
       return m_relative_state[i] * m_scale;
     }
 
   protected:
-    T m_last_absolute_state[u8(InputChannel::MAX)];
-    ControlState m_relative_state[u8(InputChannel::MAX)]{};
-    ControlState m_prev_relative_state[u8(InputChannel::MAX)]{};
+    T m_last_absolute_state[u8(InputChannel::Max)];
+    ControlState m_relative_state[u8(InputChannel::Max)]{};
+    ControlState m_prev_relative_state[u8(InputChannel::Max)]{};
     // Not really necessary but it helps to add transparency to the final user,
     // we need a multiplier to have the relative values usable. Can also be used as range
     const ControlState m_scale;
-    bool m_initialized[u8(InputChannel::MAX)]{};
+    bool m_initialized[u8(InputChannel::Max)]{};
   };
 
   //

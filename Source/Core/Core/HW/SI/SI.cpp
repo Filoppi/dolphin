@@ -651,7 +651,7 @@ void UpdateDevices()
   // succession, in order to optimize networking
   NetPlay::SetSIPollBatching(true);
 
-  g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::SI);
+  g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::SerialInterface);
 
   // Update channels and set the status bit if there's new data
   s_status_reg.RDST0 =
