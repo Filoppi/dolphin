@@ -139,7 +139,7 @@ void HotkeyScheduler::Run()
     Common::SleepCurrentThread(1000 / 60);
 
     if (Core::GetState() == Core::State::Uninitialized || Core::GetState() == Core::State::Paused)
-      g_controller_interface.UpdateInput();
+      g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::HotkeyAndUI);
 
     if (!HotkeyManagerEmu::IsEnabled())
       continue;

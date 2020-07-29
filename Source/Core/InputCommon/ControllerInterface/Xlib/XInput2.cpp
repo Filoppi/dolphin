@@ -283,7 +283,6 @@ void KeyboardMouse::UpdateInput()
     XFreeEventData(m_display, &event.xcookie);
   }
 
-  // TODO: copy new implementation from DInputKeyboardMouse.cpp
   // apply axis smoothing
   m_state.axis.x *= MOUSE_AXIS_SMOOTHING;
   m_state.axis.x += delta_x;

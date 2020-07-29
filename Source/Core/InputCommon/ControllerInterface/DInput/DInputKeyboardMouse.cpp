@@ -44,6 +44,13 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
   LPDIRECTINPUTDEVICE8 kb_device = nullptr;
   LPDIRECTINPUTDEVICE8 mo_device = nullptr;
 
+  DIPROPDWORD dw;
+  dw.dwData = DIPROPAXISMODE_ABS;
+  dw.diph.dwSize = sizeof(DIPROPDWORD);
+  dw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+  dw.diph.dwHow = DIPH_DEVICE;
+  dw.diph.dwObj = 0;
+
   // TODO: Make sure the SetCooperativeLevel hwnd is valid when we release the device
   // These are "virtual" system devices, so they are always there even if we have no physical
   // mouse and keyboard plugged into the computer
@@ -52,6 +59,7 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
       SUCCEEDED(kb_device->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND)) &&
       SUCCEEDED(idi8->CreateDevice(GUID_SysMouse, &mo_device, nullptr)) &&
       SUCCEEDED(mo_device->SetDataFormat(&c_dfDIMouse2)) &&
+      SUCCEEDED(mo_device->SetProperty(DIPROP_AXISMODE, &dw.diph)) &&  // Set absolute coordinates
       SUCCEEDED(mo_device->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND)))
   {
     // The device is recreated with a new window handle when we change main window
@@ -104,12 +112,13 @@ KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
   mouse_caps.dwAxes = std::min(mouse_caps.dwAxes, (DWORD)3);
   for (unsigned int i = 0; i < mouse_caps.dwAxes; ++i)
   {
-    const LONG& axis = (&m_state_in.mouse.lX)[i];
-    const LONG& prev_axis = (&m_state_in.previous_mouse.lX)[i];
-
     // each axis gets a negative and a positive input instance associated with it
-    AddInput(new Axis(i, axis, prev_axis, (2 == i) ? -1 : -MOUSE_AXIS_SENSITIVITY));
-    AddInput(new Axis(i, axis, prev_axis, (2 == i) ? 1 : MOUSE_AXIS_SENSITIVITY));
+    Axis* axis = new Axis((2 == i) ? -1.0 : (-1.0 / MOUSE_AXIS_SENSITIVITY), i);
+    m_mouse_axes.push_back(axis);
+    AddInput(axis);
+    axis = new Axis((2 == i) ? 1.0 : (1.0 / MOUSE_AXIS_SENSITIVITY), i);
+    m_mouse_axes.push_back(axis);
+    AddInput(axis);
   }
   // cursor, with a hax for-loop
   for (unsigned int i = 0; i <= 3; ++i)
@@ -125,7 +134,7 @@ void KeyboardMouse::UpdateCursorInput()
   // (separate or render to main)
   ScreenToClient(m_hwnd, &point);
 
-  // Get the size of the current window. (In my case Rect.top and Rect.left was zero.)
+  // Get the size of the current window (In my case Rect.top and Rect.left was zero).
   RECT rect;
   GetClientRect(m_hwnd, &rect);
 
@@ -151,20 +160,6 @@ void KeyboardMouse::UpdateInput()
 
   UpdateCursorInput();
 
-  // Only update the mouse axis twice per game video frame, or always if a game is not running.
-  // This hack is needed because we use the mouse as a fake analog stick axis.
-  // Given that the mouse works with dots (position), all we can get is the number of dots
-  // it moved by since the last update, but updates to this device are called constantly from
-  // different parts of Dolphin, not the game itself, so most of the small changes would be lost
-  // if we always just returned the very last offset.
-  // Another problem in simulating the mouse as an axis is that its speed varies extremely between
-  // frames, differently from an analog stick, this is why we blend the last 2 values together.
-  // If for some reason we needed this axis to be sub-frame accurate while a game is running
-  // (e.g. to use it with the emulated wiimote, which runs at a higher tick) we could add yet
-  // another input for that exclusively (e.g. WiiMoteRefreshRate Axis+ vs GameRefreshRate Axis+).
-  // Note that we also lerp the Z (wheel) axis
-  if (g_controller_interface.ShouldUpdateFakeRelativeAxes() ||
-      ::Core::GetState() != ::Core::State::Running)
   {
     DIMOUSESTATE2 tmp_mouse;
 
@@ -176,7 +171,8 @@ void KeyboardMouse::UpdateInput()
     {
       // set axes to zero
       m_state_in.mouse = {};
-      m_state_in.previous_mouse = m_state_in.mouse;
+      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
+        m_mouse_axes[i]->ResetState();
       // skip this input state (by calling this, the next call will return 0)
       m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
     }
@@ -192,8 +188,17 @@ void KeyboardMouse::UpdateInput()
     }
     if (SUCCEEDED(mo_hr))
     {
-      m_state_in.previous_mouse = m_state_in.mouse;
       m_state_in.mouse = tmp_mouse;
+      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
+      {
+        const LONG& axis = (&m_state_in.mouse.lX)[i/2];
+        m_mouse_axes[i]->UpdateState(axis);
+      }
+    }
+    else
+    {
+      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
+        m_mouse_axes[i]->ResetState();
     }
   }
 }
@@ -223,7 +228,7 @@ std::string KeyboardMouse::Axis::GetName() const
 {
   static char tmpstr[] = "Axis ..";
   tmpstr[5] = (char)('X' + m_index);
-  tmpstr[6] = (m_range < 0 ? '-' : '+');
+  tmpstr[6] = (m_scale < 0.0 ? '-' : '+');
   return tmpstr;
 }
 
@@ -244,12 +249,6 @@ ControlState KeyboardMouse::Key::GetState() const
 ControlState KeyboardMouse::Button::GetState() const
 {
   return (m_button != 0);
-}
-
-ControlState KeyboardMouse::Axis::GetState() const
-{
-  // Blend between the last two values (see comments above to understand)
-  return (ControlState(m_axis) + ControlState(m_prev_axis)) * 0.5 / m_range;
 }
 
 ControlState KeyboardMouse::Cursor::GetState() const

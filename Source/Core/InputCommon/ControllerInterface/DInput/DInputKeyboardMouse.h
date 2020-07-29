@@ -5,6 +5,7 @@
 #pragma once
 
 #include <windows.h>
+#include <vector>
 
 #include "Common/Matrix.h"
 #include "InputCommon/ControllerInterface/DInput/DInput8.h"
@@ -21,7 +22,6 @@ private:
   {
     BYTE keyboard[256];
     DIMOUSESTATE2 mouse;
-    DIMOUSESTATE2 previous_mouse;
     Common::TVec2<ControlState> cursor;
   };
 
@@ -56,25 +56,18 @@ private:
     const u8 m_index;
   };
 
-  // Mouse movement offset axis
-  class Axis : public Input
+  // Mouse movement offset axis. Includes mouse wheel
+  class Axis : public RelativeInput<LONG>
   {
   public:
-    Axis(u8 index, const LONG& axis, const LONG& prev_axis, LONG range)
-        : m_axis(axis), m_prev_axis(prev_axis), m_range(range), m_index(index)
-    {
-    }
+    Axis(ControlState range, u8 index) : RelativeInput(range), m_index(index) {}
     std::string GetName() const override;
-    ControlState GetState() const override;
     FocusFlags GetFocusFlags() const override
     {
       return FocusFlags(u8(FocusFlags::RequireFocus) | u8(FocusFlags::RequireFullFocus));
     }
 
   private:
-    const LONG& m_axis;
-    const LONG& m_prev_axis;
-    const LONG m_range;
     const u8 m_index;
   };
 
@@ -117,6 +110,8 @@ private:
   const LPDIRECTINPUTDEVICE8 m_mo_device;
 
   const HWND m_hwnd;
+
+  std::vector<Axis*> m_mouse_axes;
 
   DWORD m_last_update;
   State m_state_in;

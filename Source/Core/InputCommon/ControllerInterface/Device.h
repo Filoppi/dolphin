@@ -13,7 +13,7 @@
 
 #include "Common/CommonTypes.h"
 
-// idk in case I wanted to change it to double or something, idk what's best
+// idk in case I wanted to change it from double or something, idk what's best
 typedef double ControlState;
 
 namespace ciface
@@ -94,6 +94,15 @@ public:
     Default = RequireFocus
   };
 
+  // This should be in ControllerInterface.h but it's here to avoid recursive includes
+  enum class InputChannel : u8
+  {
+    SI,           // GC Controllers
+    BT,           // WiiMote and other BT devices
+    HotkeyAndUI,  // Hotkeys (worker thread) and UI (game input config panels, main thread)
+    MAX
+  };
+
   //
   // Input
   //
@@ -121,6 +130,58 @@ public:
     virtual ControlState GetState() const = 0;
 
     Input* ToInput() override { return this; }
+
+protected:
+    InputChannel GetCurrentInputChannel() const;
+  };
+
+  //
+  // RelativeInput
+  //
+  // Helper to generate a relative input from an absolute one.
+  // Keeps the last 2 absolute states and returns their difference.
+  // It has one state per input channel, as otherwise one SetState() would break
+  // GetState() from the other channels
+  //
+  template <typename T = ControlState>
+  class RelativeInput : public Input
+  {
+  public:
+    RelativeInput(ControlState scale = 1.0) : m_scale(scale) {}
+    void UpdateState(T absolute_state)
+    {
+      u8 i = u8(GetCurrentInputChannel());
+      m_prev_relative_state[i] = m_relative_state[i];
+      m_relative_state[i] = m_initialized[i] ? (absolute_state - m_last_absolute_state[i]) : 0.0;
+      m_last_absolute_state[i] = absolute_state;
+      m_initialized[i] = true;
+    }
+    void ResetState()
+    {
+      u8 i = u8(GetCurrentInputChannel());
+      m_initialized[i] = false;
+      m_relative_state[i] = 0.0;
+    }
+    ControlState GetState() const override
+    {
+      InputChannel input_channel = GetCurrentInputChannel();
+      u8 i = u8(input_channel);
+      // SI updates at twice the video refresh rate of the game, it's very unlikely
+      // that games will read both inputs so we average the last two, trade a bit
+      // of latency for accuracy and smoothness. Theoretically this should be per game
+      if (input_channel == InputChannel::SI)
+        return ControlState(m_relative_state[i] - m_prev_relative_state[i]) * 0.5 * m_scale;
+      return m_relative_state[i] * m_scale;
+    }
+
+  protected:
+    T m_last_absolute_state[u8(InputChannel::MAX)];
+    ControlState m_relative_state[u8(InputChannel::MAX)]{};
+    ControlState m_prev_relative_state[u8(InputChannel::MAX)]{};
+    // Not really necessary but it helps to add transparency to the final user,
+    // we need a multiplier to have the relative values usable. Can also be used as range
+    const ControlState m_scale;
+    bool m_initialized[u8(InputChannel::MAX)]{};
   };
 
   //

@@ -8,6 +8,7 @@
 
 #include "Common/Logging/Log.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
+#include "InputCommon/ControllerInterface/Device.h"
 
 #ifdef CIFACE_USE_WIN32
 #include "InputCommon/ControllerInterface/Win32/Win32.h"
@@ -36,6 +37,11 @@
 #endif
 
 ControllerInterface g_controller_interface;
+
+// We start from InputChannel::HotkeyAndUI on all threads as hotkeys are updated from a worker thread,
+// but UI can read from the main thread. This will never interfere with game threads
+static thread_local ciface::Core::Device::InputChannel tls_input_channel =
+    ciface::Core::Device::InputChannel::HotkeyAndUI;
 
 void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 {
@@ -250,16 +256,19 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
 }
 
 // Update input for all devices if lock can be acquired without waiting.
-void ControllerInterface::UpdateInput(bool update_fake_relative_axes)
+void ControllerInterface::UpdateInput(ciface::Core::Device::InputChannel input_channel)
 {
+  // We set the write and read input channel here, see Device::RelativeInput for more info.
+  // Inputs for this channel will be read immediately after this call.
+  // Make you don't read them after the input channel might have changed again
+  tls_input_channel = input_channel;
+
   // Don't block the UI or CPU thread (to avoid a short but noticeable frame drop)
   if (m_devices_mutex.try_lock())
   {
     std::lock_guard lk(m_devices_mutex, std::adopt_lock);
-    should_update_fake_relative_axes = update_fake_relative_axes;
     for (const auto& d : m_devices)
       d->UpdateInput();
-    should_update_fake_relative_axes = false;
   }
 }
 
@@ -302,4 +311,9 @@ void ControllerInterface::InvokeDevicesChangedCallbacks() const
   std::lock_guard<std::mutex> lk(m_callbacks_mutex);
   for (const auto& callback : m_devices_changed_callbacks)
     callback();
+}
+
+ciface::Core::Device::InputChannel ControllerInterface::GetCurrentInputChannel()
+{
+  return tls_input_channel;
 }

@@ -651,13 +651,7 @@ void UpdateDevices()
   // succession, in order to optimize networking
   NetPlay::SetSIPollBatching(true);
 
-  // Update inputs at the rate of SI: typically 120Hz
-  // but its variable (double of the game frame rate).
-  // Given that the mouse axis is a hack, we need to
-  // clamp its update rate to get the correct values,
-  // so we ask for it to only be updated here.
-  // (See more in DInputKeyboardMouse.cpp)
-  g_controller_interface.UpdateInput(true);
+  g_controller_interface.UpdateInput(ciface::Core::Device::InputChannel::SI);
 
   // Update channels and set the status bit if there's new data
   s_status_reg.RDST0 =

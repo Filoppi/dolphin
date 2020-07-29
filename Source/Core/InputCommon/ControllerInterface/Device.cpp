@@ -14,6 +14,7 @@
 #include <fmt/format.h>
 
 #include "Common/Thread.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 namespace ciface::Core
 {
@@ -323,5 +324,10 @@ DeviceContainer::DetectInput(u32 wait_ms, const std::vector<std::string>& device
 
   // No input was detected. :'(
   return {};
+}
+
+Device::InputChannel Device::Input::GetCurrentInputChannel() const
+{
+  return ControllerInterface::GetCurrentInputChannel();
 }
 }  // namespace ciface::Core
