@@ -113,7 +113,6 @@ private:
 
   std::vector<Axis*> m_mouse_axes;
 
-  DWORD m_last_update;
   State m_state_in;
 };
 }  // namespace ciface::DInput

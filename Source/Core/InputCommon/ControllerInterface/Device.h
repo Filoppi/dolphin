@@ -141,7 +141,7 @@ protected:
   // Helper to generate a relative input from an absolute one.
   // Keeps the last 2 absolute states and returns their difference.
   // It has one state per input channel, as otherwise one SetState() would break
-  // GetState() from the other channels
+  // GetState() from the other channels. You don't have to use this implementation
   //
   template <typename T = ControlState>
   class RelativeInput : public Input

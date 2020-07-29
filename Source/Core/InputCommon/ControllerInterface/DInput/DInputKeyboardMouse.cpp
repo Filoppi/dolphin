@@ -14,10 +14,6 @@
 // Users can multiply it anyway (lower is more sensitive)
 #define MOUSE_AXIS_SENSITIVITY 17
 
-// If input hasn't been received for this many ms, mouse input will be skipped
-// otherwise it is just some crazy value
-#define DROP_INPUT_TIME 250
-
 namespace ciface::DInput
 {
 static const struct
@@ -87,8 +83,7 @@ KeyboardMouse::~KeyboardMouse()
 
 KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
                              const LPDIRECTINPUTDEVICE8 mo_device, HWND hwnd)
-    : m_kb_device(kb_device), m_mo_device(mo_device), m_hwnd(hwnd), m_last_update(GetTickCount()),
-      m_state_in()
+    : m_kb_device(kb_device), m_mo_device(mo_device), m_hwnd(hwnd), m_state_in()
 {
   s_keyboard_mouse_exists = true;
 
@@ -160,45 +155,27 @@ void KeyboardMouse::UpdateInput()
 
   UpdateCursorInput();
 
+  DIMOUSESTATE2 tmp_mouse;
+
+  // The mouse location this returns is the difference from the last time it was called
+  HRESULT mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+  if (DIERR_INPUTLOST == mo_hr || DIERR_NOTACQUIRED == mo_hr)
   {
-    DIMOUSESTATE2 tmp_mouse;
-
-    // if mouse position hasn't been updated in a short while, skip a dev state
-    DWORD cur_time = GetTickCount();
-
-    // TODO: this just sounds wrong, whatever value we get, it should be handled
-    if (cur_time - m_last_update > DROP_INPUT_TIME)
+    // We assume in case the mouse device failed to retrieve the state once,
+    // that the state will somehow be reset. This probably can't even happen as it's
+    // an emulated device
+    for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
+      m_mouse_axes[i]->ResetState();
+    if (SUCCEEDED(m_mo_device->Acquire()))
+      mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+  }
+  if (SUCCEEDED(mo_hr))
+  {
+    m_state_in.mouse = tmp_mouse;
+    for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
     {
-      // set axes to zero
-      m_state_in.mouse = {};
-      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
-        m_mouse_axes[i]->ResetState();
-      // skip this input state (by calling this, the next call will return 0)
-      m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
-    }
-
-    m_last_update = cur_time;
-
-    // The mouse location this returns is the difference from the last time it was called
-    HRESULT mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
-    if (DIERR_INPUTLOST == mo_hr || DIERR_NOTACQUIRED == mo_hr)
-    {
-      if (SUCCEEDED(m_mo_device->Acquire()))
-        mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
-    }
-    if (SUCCEEDED(mo_hr))
-    {
-      m_state_in.mouse = tmp_mouse;
-      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
-      {
-        const LONG& axis = (&m_state_in.mouse.lX)[i/2];
-        m_mouse_axes[i]->UpdateState(axis);
-      }
-    }
-    else
-    {
-      for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
-        m_mouse_axes[i]->ResetState();
+      const LONG& axis = (&m_state_in.mouse.lX)[i/2];
+      m_mouse_axes[i]->UpdateState(axis);
     }
   }
 }
