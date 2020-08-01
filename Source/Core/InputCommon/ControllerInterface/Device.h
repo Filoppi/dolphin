@@ -141,7 +141,7 @@ protected:
   // Helper to generate a relative input from an absolute one.
   // Keeps the last 2 absolute states and returns their difference.
   // It has one state per input channel, as otherwise one SetState() would break
-  // GetState() from the other channels. You don't have to use this implementation
+  // GetState() on the other channels. You don't have to use this implementation
   //
   template <typename T = ControlState>
   class RelativeInput : public Input
@@ -150,38 +150,45 @@ protected:
     RelativeInput(ControlState scale = 1.0) : m_scale(scale) {}
     void UpdateState(T absolute_state)
     {
-      u8 i = u8(GetCurrentInputChannel());
-      m_prev_relative_state[i] = m_relative_state[i];
-      m_relative_state[i] = m_initialized[i] ? (absolute_state - m_last_absolute_state[i]) : 0.0;
-      m_last_absolute_state[i] = absolute_state;
-      m_initialized[i] = true;
+      const u8 i = u8(GetCurrentInputChannel());
+      m_states[i].prev_relative_state = m_states[i].relative_state;
+      m_states[i].relative_state =
+          m_states[i].initialized ? (absolute_state - m_states[i].last_absolute_state) : 0.0;
+      m_states[i].last_absolute_state = absolute_state;
+      m_states[i].initialized = true;
     }
     void ResetState()
     {
-      u8 i = u8(GetCurrentInputChannel());
-      m_initialized[i] = false;
-      m_relative_state[i] = 0.0;
+      const u8 i = u8(GetCurrentInputChannel());
+      m_states[i].initialized = false;
+      m_states[i].relative_state = 0.0;
     }
     ControlState GetState() const override
     {
-      InputChannel input_channel = GetCurrentInputChannel();
-      u8 i = u8(input_channel);
-      // SI updates at twice the video refresh rate of the game, it's very unlikely
-      // that games will read both inputs so we average the last two, trade a bit
-      // of latency for accuracy and smoothness. Theoretically this should be a per game setting
+      const InputChannel input_channel = GetCurrentInputChannel();
+      const u8 i = u8(input_channel);
+      // SerialInterface updates at twice the video refresh rate of the game, it's very unlikely
+      // that games will consider/read both inputs (there is no need to with non relative inputs)
+      // so we average the last two, trading a bit of "latency" for accuracy.
+      // Theoretically this should be a per game or per input setting.
       if (input_channel == InputChannel::SerialInterface)
-        return (m_relative_state[i] + m_prev_relative_state[i]) * 0.5 * m_scale;
-      return m_relative_state[i] * m_scale;
+        return (m_states[i].relative_state + m_states[i].prev_relative_state) * 0.5 * m_scale;
+      return m_states[i].relative_state * m_scale;
     }
 
   protected:
-    T m_last_absolute_state[u8(InputChannel::Max)];
-    ControlState m_relative_state[u8(InputChannel::Max)]{};
-    ControlState m_prev_relative_state[u8(InputChannel::Max)]{};
+    struct RelativeInputState
+    {
+      T last_absolute_state;
+      ControlState relative_state = 0.0;
+      ControlState prev_relative_state = 0.0;
+      bool initialized = false;
+    };
+
+    RelativeInputState m_states[u8(InputChannel::Max)];
     // Not really necessary but it helps to add transparency to the final user,
     // we need a multiplier to have the relative values usable. Can also be used as range
     const ControlState m_scale;
-    bool m_initialized[u8(InputChannel::Max)]{};
   };
 
   //
