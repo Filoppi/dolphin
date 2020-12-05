@@ -63,8 +63,13 @@ Cursor::Cursor(std::string name, std::string ui_name)
              13.25, 0, 360);
 
   AddSetting(&m_relative_setting, {_trans("Relative Input")}, false);
-  // TODO: link to the setting above and grey it out if it's off
-  AddSetting(&m_relative_absolute_time_setting, {_trans("Relative Input Absolute Time")}, false);
+  NumericSetting<bool>* edit_condition =
+      static_cast<NumericSetting<bool>*>(numeric_settings.back().get());
+  AddSetting(&m_relative_absolute_time_setting,
+             {_trans("Relative Input Absolute Time"),
+              _trans(""),
+              _trans("Enable if you are using an absolute input device (e.g. mouse).")},
+             false, false, true, edit_condition);
   AddSetting(&m_autohide_setting, {_trans("Auto-Hide")}, false);
   numeric_settings.back().get()->GetInputReference().default_range = AUTO_HIDE_MS / 1000.0;
   numeric_settings.back().get()->GetInputReference().range = AUTO_HIDE_MS / 1000.0;
@@ -111,10 +116,12 @@ Cursor::StateData Cursor::GetState(float absolute_time_elapsed, bool is_ui)
     }
     else
     {
-      // If we are using a mouse axis to drive the cursor (there are reasons to), we don't want the
+      // If we are using a mouse axis to drive the cursor (there are reasons to), we want the
       // step to be independent from the game speed, otherwise it would move at a different speed
-      // depending on the game speed. I know it sounds like it doesn't make sense but it does.
-      // In other words, we want to be indipendent from time, and just use it as an absolute cursor
+      // depending on the game speed.
+      // In other words, we want to be indipendent from time, and just use it as an absolute cursor.
+      // Of course if the emulation can't keep up with the wii mote
+      // emulation rate, the absolute time won't be accurate.
       bool use_absolute_time = m_relative_absolute_time_setting.GetValue() && !is_ui;
       const double step =
           STEP_PER_SEC * (use_absolute_time ? absolute_time_elapsed : (ms_since_update / 1000.0));
