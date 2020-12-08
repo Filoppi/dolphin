@@ -24,9 +24,24 @@ bool PulseAudio::Init()
 
   NOTICE_LOG(AUDIO, "PulseAudio backend using %d channels", m_channels);
 
-  m_run_thread.Set();
-  m_thread = std::thread(&PulseAudio::SoundLoop, this);
+  if (PulseInit())
+  {
+    m_run_thread.Set();
+    m_thread = std::thread(&PulseAudio::SoundLoop, this);
+    return true;
+  }
+  else
+  {
+    PulseShutdown();
+  }
+  return false;
+}
 
+bool PulseAudio::SetRunning(bool running)
+{
+  // Differently from other backends, we don't start or stop the stream here,
+  // we just play mute/zero samples if we are not running
+  m_running = running;
   return true;
 }
 
@@ -39,18 +54,15 @@ PulseAudio::~PulseAudio()
 // Called on audio thread
 void PulseAudio::SoundLoop()
 {
-  Common::SetCurrentThreadName("Audio thread - pulse");
+  Common::SetCurrentThreadName("Audio thread - Pulse");
 
-  if (PulseInit())
-  {
-    while (m_run_thread.IsSet() && m_pa_connected == 1 && m_pa_error >= 0)
-      m_pa_error = pa_mainloop_iterate(m_pa_ml, 1, nullptr);
+  while (m_run_thread.IsSet() && m_pa_connected == 1 && m_pa_error >= 0)
+    m_pa_error = pa_mainloop_iterate(m_pa_ml, 1, nullptr);
 
-    if (m_pa_error < 0)
-      ERROR_LOG(AUDIO, "PulseAudio error: %s", pa_strerror(m_pa_error));
+  if (m_pa_error < 0)
+    ERROR_LOG(AUDIO, "PulseAudio error: %s", pa_strerror(m_pa_error));
 
-    PulseShutdown();
-  }
+  PulseShutdown();
 }
 
 bool PulseAudio::PulseInit()
@@ -58,7 +70,7 @@ bool PulseAudio::PulseInit()
   m_pa_error = 0;
   m_pa_connected = 0;
 
-  // create pulseaudio main loop and context
+  // create PulseAudio main loop and context
   // also register the async state callback which is called when the connection to the pa server has
   // changed
   m_pa_ml = pa_mainloop_new();
@@ -67,7 +79,7 @@ bool PulseAudio::PulseInit()
   m_pa_error = pa_context_connect(m_pa_ctx, nullptr, PA_CONTEXT_NOFLAGS, nullptr);
   pa_context_set_state_callback(m_pa_ctx, StateCallback, this);
 
-  // wait until we're connected to the pulseaudio server
+  // wait until we're connected to the PulseAudio server
   while (m_pa_connected == 0 && m_pa_error >= 0)
     m_pa_error = pa_mainloop_iterate(m_pa_ml, 1, nullptr);
 
@@ -124,17 +136,18 @@ bool PulseAudio::PulseInit()
   m_pa_error = pa_stream_connect_playback(m_pa_s, nullptr, &m_pa_ba, flags, nullptr, nullptr);
   if (m_pa_error < 0)
   {
-    pa_stream_disconnect(m_pa_s);
-    pa_stream_unref(m_pa_s);
-    m_pa_s = nullptr;
-
+    // Theoretically PulseAudio should not fail based on the number of channels (as it just remixes
+    // anyway), but we never know so we fallback to stereo
     if (!m_stereo)
     {
       ERROR_LOG(AUDIO, "PulseAudio failed to initialize (6.0, falling back to 2.0): %s",
                 pa_strerror(m_pa_error));
       m_stereo = true;
 
-      m_channels = m_stereo ? 2 : 6;
+      pa_stream_disconnect(m_pa_s);
+      pa_stream_unref(m_pa_s);
+
+      m_channels = 2;
       ss.format = PA_SAMPLE_S16LE;
       m_bytespersample = sizeof(s16);
       ss.channels = m_channels;
@@ -147,12 +160,6 @@ bool PulseAudio::PulseInit()
       pa_stream_set_underflow_callback(m_pa_s, UnderflowCallback, this);
 
       m_pa_error = pa_stream_connect_playback(m_pa_s, nullptr, &m_pa_ba, flags, nullptr, nullptr);
-      if (m_pa_error < 0)
-      {
-        pa_stream_disconnect(m_pa_s);
-        pa_stream_unref(m_pa_s);
-        m_pa_s = nullptr;
-      }
     }
 
     if (m_pa_error < 0)
@@ -168,6 +175,12 @@ bool PulseAudio::PulseInit()
 
 void PulseAudio::PulseShutdown()
 {
+  if (m_pa_s)
+  {
+    pa_stream_disconnect(m_pa_s);
+    pa_stream_unref(m_pa_s);
+    m_pa_s = nullptr;
+  }
   pa_context_disconnect(m_pa_ctx);
   pa_context_unref(m_pa_ctx);
   pa_mainloop_free(m_pa_ml);
@@ -193,14 +206,14 @@ void PulseAudio::StateCallback(pa_context* c)
   }
 }
 
-// On underflow, increase pulseaudio latency in ~10ms steps
+// On underflow, increase PulseAudio latency in ~10ms steps
 void PulseAudio::UnderflowCallback(pa_stream* s)
 {
   m_pa_ba.tlength += BUFFER_SAMPLES * m_channels * m_bytespersample;
   pa_operation* op = pa_stream_set_buffer_attr(s, &m_pa_ba, nullptr, nullptr);
   pa_operation_unref(op);
 
-  WARN_LOG(AUDIO, "pulseaudio underflow, new latency: %d bytes", m_pa_ba.tlength);
+  WARN_LOG(AUDIO, "PulseAudio underflow, new latency: %d bytes", m_pa_ba.tlength);
 }
 
 void PulseAudio::WriteCallback(pa_stream* s, size_t length)
@@ -209,35 +222,31 @@ void PulseAudio::WriteCallback(pa_stream* s, size_t length)
   int frames = (length / bytes_per_frame);
   size_t trunc_length = frames * bytes_per_frame;
 
-  // fetch dst buffer directly from pulseaudio, so no memcpy is needed
+  // fetch dst buffer directly from PulseAudio, so no memcpy is needed
   void* buffer;
   m_pa_error = pa_stream_begin_write(s, &buffer, &trunc_length);
 
   if (!buffer || m_pa_error < 0)
     return;  // error will be printed from main loop
 
-  if (m_stereo)
+  if (m_running)
   {
-    // use the raw s16 stereo mix
-    m_mixer->Mix((s16*)buffer, frames);
-  }
-  else
-  {
-    if (m_channels == 6)  // Extract dpl2/5.1 Surround
+    if (m_stereo)
     {
-      m_mixer->MixSurround((float*)buffer, frames);
+      // use the raw s16 stereo mix
+      m_mixer->Mix((s16*)buffer, frames);
     }
     else
     {
-      ERROR_LOG(AUDIO, "Unsupported number of PA channels requested: %d", (int)m_channels);
-      return;
+      // Extract dpl2/5.1 Surround
+      m_mixer->MixSurround((float*)buffer, frames);
     }
   }
 
   m_pa_error = pa_stream_write(s, buffer, trunc_length, nullptr, 0, PA_SEEK_RELATIVE);
 }
 
-// Callbacks that forward to internal methods (required because PulseAudio is a C API).
+// Callbacks that forward to internal methods (required because PulseAudio is a C API)
 
 void PulseAudio::StateCallback(pa_context* c, void* userdata)
 {
