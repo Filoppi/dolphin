@@ -32,7 +32,7 @@ bool IsSettingSaveable(const Config::Location& config_location)
     }
   }
 
-  static constexpr std::array<const Config::Location*, 16> s_setting_saveable = {
+  static constexpr std::array<const Config::Location*, 15> s_setting_saveable = {
       // Main.Core
 
       &Config::MAIN_DEFAULT_ISO.location,
@@ -43,7 +43,6 @@ bool IsSettingSaveable(const Config::Location& config_location)
       &Config::MAIN_DPL2_DECODER.location,
       &Config::MAIN_DPL2_QUALITY.location,
       &Config::MAIN_DPL2_BASS_REDIRECTION.location,
-      &Config::MAIN_DPL2_PERFORMANCE_OVER_LATENCY.location,
       &Config::MAIN_AUDIO_MIXER_MIN_LATENCY.location,
       &Config::MAIN_AUDIO_MIXER_MAX_LATENCY.location,
       &Config::MAIN_RAM_OVERRIDE_ENABLE.location,
