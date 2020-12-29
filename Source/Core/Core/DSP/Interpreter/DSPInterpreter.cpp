@@ -16,6 +16,10 @@
 
 namespace DSP::Interpreter
 {
+// Not needed for game ucodes (it slows down interpreter + easier to compare int VS
+// dspjit64 without it)
+//#define PRECISE_BACKLOG
+
 Interpreter::Interpreter(DSPCore& dsp) : m_dsp_core{dsp}
 {
   InitInstructionTables();
@@ -42,14 +46,16 @@ void Interpreter::ExecuteInstruction(const UDSPInstruction inst)
 
 void Interpreter::Step()
 {
-  m_dsp_core.CheckExceptions();
-  m_dsp_core.DSPState().step_counter++;
+  auto& state = m_dsp_core.DSPState();
 
-  const u16 opc = m_dsp_core.DSPState().FetchInstruction();
+  m_dsp_core.CheckExceptions();
+  state.step_counter++;
+
+  const u16 opc = state.FetchInstruction();
   ExecuteInstruction(UDSPInstruction{opc});
 
-  const auto pc = m_dsp_core.DSPState().pc;
-  if ((Analyzer::GetCodeFlags(static_cast<u16>(pc - 1)) & Analyzer::CODE_LOOP_END) != 0)
+  const auto pc = state.pc;
+  if (state.GetAnalyzer().IsLoopEnd(static_cast<u16>(pc - 1)))
     HandleLoop();
 }
 
@@ -113,8 +119,7 @@ int Interpreter::RunCyclesDebug(int cycles)
         return cycles;
       }
 
-      // Idle skipping.
-      if ((Analyzer::GetCodeFlags(state.pc) & Analyzer::CODE_IDLE_SKIP) != 0)
+      if (state.GetAnalyzer().IsIdleSkip(state.pc))
         return 0;
 
       Step();
@@ -169,8 +174,7 @@ int Interpreter::RunCycles(int cycles)
       if ((state.cr & CR_HALT) != 0)
         return 0;
 
-      // Idle skipping.
-      if ((Analyzer::GetCodeFlags(state.pc) & Analyzer::CODE_IDLE_SKIP) != 0)
+      if (state.GetAnalyzer().IsIdleSkip(state.pc))
         return 0;
 
       Step();
@@ -201,7 +205,7 @@ void Interpreter::WriteCR(u16 val)
   {
     INFO_LOG_FMT(DSPLLE, "DSP_CONTROL RESET");
     m_dsp_core.Reset();
-    val &= ~1;
+    val &= ~CR_RESET;
   }
   // init
   else if (val == 4)
@@ -210,7 +214,7 @@ void Interpreter::WriteCR(u16 val)
     // OSInitAudioSystem ucode should send this mail - not DSP core itself
     INFO_LOG_FMT(DSPLLE, "DSP_CONTROL INIT");
     m_dsp_core.SetInitHax(true);
-    val |= 0x800;
+    val |= CR_INIT;
   }
 
   // update cr
@@ -223,11 +227,11 @@ u16 Interpreter::ReadCR()
 
   if ((state.pc & 0x8000) != 0)
   {
-    state.cr |= 0x800;
+    state.cr |= CR_INIT;
   }
   else
   {
-    state.cr &= ~0x800;
+    state.cr &= ~CR_INIT;
   }
 
   return state.cr;

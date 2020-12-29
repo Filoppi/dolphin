@@ -25,10 +25,6 @@
 
 namespace DSP
 {
-// not needed for game ucodes (it slows down interpreter/dspjit32 + easier to compare int VS
-// dspjit64 without it)
-//#define PRECISE_BACKLOG
-
 // Returns false if the hash fails and the user hits "Yes"
 static bool VerifyRoms(const SDSP& dsp)
 {
@@ -161,7 +157,7 @@ bool SDSP::Initialize(const DSPInitOptions& opts)
   r.sr |= SR_INT_ENABLE;
   r.sr |= SR_EXT_INT_ENABLE;
 
-  cr = 0x804;
+  cr = CR_INIT | CR_HALT;
   InitializeIFX();
   // Mostly keep IRAM write protected. We unprotect only when DMA-ing
   // in new ucodes.
@@ -487,7 +483,7 @@ void DSPCore::Step()
 void DSPCore::Reset()
 {
   m_dsp.Reset();
-  Analyzer::Analyze(m_dsp);
+  m_dsp.GetAnalyzer().Analyze(m_dsp);
 }
 
 void DSPCore::ClearIRAM()
