@@ -298,12 +298,13 @@ static void DTKStreamingCallback(DIInterruptType interrupt_type, const std::vect
 {
   // This determines which audio data to read next.
   // Similarly to DMA audio, instead of sending a different number of samples each submission,
-  // we just change the frequency of the submission to match the sample rate. This causes more
-  // imprecision on GC, where sample rates aren't integer, but it should mostly be fine.
+  // we just change the frequency of the submission to match the sample rate.
+  // This is the only way to resolve floating point sample rates from the GC without precision loss.
   // The Mixer (Mixer.cpp) might assume the above is true, so if you change the samples submitted
   // per submission, make sure you review the Mixer as well.
 
-  // 168 samples (3.5ms at 48kHz/5.25ms at 32kHz on Wii, similar numbers on GC)
+  // 168 samples (3.5ms at 48kHz/5.25ms at 32kHz on Wii, similar numbers on GC).
+  // This number isn't HW tested, it was found randomly.
   static const int MAXIMUM_SAMPLES = 168;
   u64 read_offset = 0;
   u32 read_length = 0;
