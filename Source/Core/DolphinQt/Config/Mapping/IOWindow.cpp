@@ -175,6 +175,10 @@ void ControlExpressionSyntaxHighlighter::highlightBlock(const QString&)
     ciface::ExpressionParser::RemoveInertTokens(&tokens);
     const auto parse_status = ciface::ExpressionParser::ParseTokens(tokens);
 
+    //To review: m_result_text is now defined previously, move the code that changes it below to the new location
+    //m_result_text->setText(
+    //    QString::fromStdString(parse_status.description.value_or(_trans("Success."))));
+
     if (ciface::ExpressionParser::ParseStatus::Successful != parse_status.status)
     {
       const auto token = *parse_status.token;
@@ -210,7 +214,7 @@ void ControlExpressionSyntaxHighlighter::highlightBlock(const QString&)
         }
       }
 
-      m_result_text->setText(m_result_text->text() + QString::fromStdString(appended_flags));
+      //m_result_text->setText(m_result_text->text() + QString::fromStdString(appended_flags));
     }
   }
 }
@@ -325,11 +329,12 @@ void IOWindow::CreateMainLayout()
   AddFunction("min");
   AddFunction("max");
   AddFunction("clamp");
+  AddFunction("minus");
   AddFunction("pow");
   AddFunction("sqrt");
   AddFunction("sin");
-  AddFunction("cos"));
-  AddFunction("tan"));
+  AddFunction("cos");
+  AddFunction("tan");
   AddFunction("asin");
   AddFunction("acos");
   AddFunction("atan");

@@ -61,6 +61,26 @@ private:
   }
 };
 
+// usage: minus(expression)
+class UnaryMinusExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"expression"};
+  }
+
+  ControlState GetValue() const override
+  {
+    // Subtraction for clarity:
+    return 0.0 - GetArg(0).GetValue();
+  }
+};
+
 // usage: pow(base, exponent)
 class PowExpression : public FunctionExpression
 {
@@ -1015,9 +1035,8 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<MaxExpression>();
   if (name == "clamp")
     return std::make_unique<ClampExpression>();
-  //To review: this isn't exposed to UI (it was added by merge with master)
-  //if (name == "minus")
-  //  return std::make_unique<UnaryMinusExpression>();
+  if (name == "minus")
+    return std::make_unique<UnaryMinusExpression>();
   if (name == "pow")
     return std::make_unique<PowExpression>();
   if (name == "sqrt")
