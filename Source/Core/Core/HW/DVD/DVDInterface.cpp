@@ -304,7 +304,9 @@ static void DTKStreamingCallback(DIInterruptType interrupt_type, const std::vect
   // per submission, make sure you review the Mixer as well.
 
   // 168 samples (3.5ms at 48kHz/5.25ms at 32kHz on Wii, similar numbers on GC).
-  // This number isn't HW tested, it was found randomly.
+  // This number isn't HW tested, it was decided randomly.
+  // Real HW might read 32KB at a time, increasing the latency, which would mean our DVD audio
+  // could be slightly desynchronized from the video, at least compared to real HW.
   static const int MAXIMUM_SAMPLES = 168;
   u64 read_offset = 0;
   u32 read_length = 0;
