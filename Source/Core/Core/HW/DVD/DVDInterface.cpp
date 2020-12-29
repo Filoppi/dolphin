@@ -304,7 +304,7 @@ static void DTKStreamingCallback(DIInterruptType interrupt_type, const std::vect
   // per submission, make sure you review the Mixer as well.
 
   // 168 samples (3.5ms at 48kHz/5.25ms at 32kHz on Wii, similar numbers on GC)
-  static const int MAXIMUM_SAMPLES = 48000 / 2000 * 7;
+  static const int MAXIMUM_SAMPLES = 168;
   u64 read_offset = 0;
   u32 read_length = 0;
 

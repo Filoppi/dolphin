@@ -758,10 +758,6 @@ void SConfig::LoadDefaults()
   m_audio_emu_speed_tolerance = 20;
   bUsePanicHandlers = true;
 
-  m_analytics_id = "";
-  m_analytics_enabled = false;
-  m_analytics_permission_asked = false;
-
   bLoopFifoReplay = true;
 
   bJITOff = false;  // debugger only settings

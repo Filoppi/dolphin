@@ -339,8 +339,8 @@ void BluetoothEmu::Update()
 
   if (now - m_last_ticks > interval)
   {
-    for (unsigned int i = 0; i < m_wiimotes.size(); i++)
-      Wiimote::Update(i, m_wiimotes[i].IsConnected());
+    for (auto& wiimote : m_wiimotes)
+      wiimote->UpdateInput();
     m_last_ticks = now;
   }
 

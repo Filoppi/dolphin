@@ -20,6 +20,7 @@ using FSec = std::chrono::duration<ControlState>;
 // usage: min(expression1, expression2)
 class MinExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -41,6 +42,7 @@ class MinExpression : public FunctionExpression
 // usage: max(expression1, expression2)
 class MaxExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -62,6 +64,7 @@ class MaxExpression : public FunctionExpression
 // usage: pow(base, exponent)
 class PowExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -228,63 +231,6 @@ private:
   ControlState GetValue() const override { return std::sqrt(GetArg(0).GetValue()); }
 };
 
-// usage: pow(base, exponent)
-class PowExpression : public FunctionExpression
-{
-private:
-  ArgumentValidation
-  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
-  {
-    if (args.size() == 2)
-      return ArgumentsAreValid{};
-    else
-      return ExpectedArguments{"base, exponent"};
-  }
-
-  ControlState GetValue() const override
-  {
-    return std::pow(GetArg(0).GetValue(), GetArg(1).GetValue());
-  }
-};
-
-// usage: min(a, b)
-class MinExpression : public FunctionExpression
-{
-private:
-  ArgumentValidation
-  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
-  {
-    if (args.size() == 2)
-      return ArgumentsAreValid{};
-    else
-      return ExpectedArguments{"a, b"};
-  }
-
-  ControlState GetValue() const override
-  {
-    return std::min(GetArg(0).GetValue(), GetArg(1).GetValue());
-  }
-};
-
-// usage: max(a, b)
-class MaxExpression : public FunctionExpression
-{
-private:
-  ArgumentValidation
-  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
-  {
-    if (args.size() == 2)
-      return ArgumentsAreValid{};
-    else
-      return ExpectedArguments{"a, b"};
-  }
-
-  ControlState GetValue() const override
-  {
-    return std::max(GetArg(0).GetValue(), GetArg(1).GetValue());
-  }
-};
-
 // usage: clamp(value, min, max)
 class ClampExpression : public FunctionExpression
 {
@@ -343,7 +289,6 @@ private:
     return progress;
   }
 
-private:
   mutable Clock::time_point m_start_time = Clock::now();
 };
 
@@ -370,6 +315,7 @@ private:
 // usage: deadzone(input, amount)
 class DeadzoneExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -392,6 +338,7 @@ class DeadzoneExpression : public FunctionExpression
 // but will treat 0.3 as 0.125. It should be applied after deadzone
 class AntiDeadzoneExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -423,6 +370,7 @@ class AntiDeadzoneExpression : public FunctionExpression
 // you'd like to change it. Mostly used on the x axis (left/right).
 class BezierCurveExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -466,6 +414,7 @@ class BezierCurveExpression : public FunctionExpression
 // Use after AntiDeadzone and BezierCurve. In some games acceleration is only on the X axis.
 class AntiAccelerationExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -523,7 +472,6 @@ class AntiAccelerationExpression : public FunctionExpression
     return std::copysign(abs_val * multiplier, val);
   }
 
-private:
   mutable Clock::time_point m_last_update = Clock::now();
   mutable ControlState m_elapsed = 0.0;
 };
@@ -532,6 +480,7 @@ private:
 // seconds is seconds to change from 0.0 to 1.0
 class SmoothExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -568,7 +517,6 @@ class SmoothExpression : public FunctionExpression
     return m_value;
   }
 
-private:
   mutable ControlState m_value = 0.0;
   mutable Clock::time_point m_last_update = Clock::now();
 };
@@ -757,6 +705,7 @@ private:
 // usage: hold(input, seconds)
 class HoldExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -797,6 +746,7 @@ private:
 // Double+ click detection
 class TapExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -857,6 +807,7 @@ private:
 // speed is max movement per second
 class RelativeExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -916,6 +867,7 @@ private:
 // usage: pulse(input, seconds)
 class PulseExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -971,6 +923,7 @@ private:
 // but you want to ignore that. Note that this applies to every input in the expression
 class SetIgnoreFocusExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -990,6 +943,7 @@ class SetIgnoreFocusExpression : public FunctionExpression
 // See Device::FocusFlags::IgnoreOnFocusChanged
 class SetIgnoreOnFocusChangeExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -1013,6 +967,7 @@ class SetIgnoreOnFocusChangeExpression : public FunctionExpression
 // Can be used similarly to a time delta
 class GetGameSpeedExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -1030,6 +985,7 @@ class GetGameSpeedExpression : public FunctionExpression
 // like game pause or unlimit emulation speed
 class HasFocusExpression : public FunctionExpression
 {
+private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
@@ -1059,6 +1015,9 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<MaxExpression>();
   if (name == "clamp")
     return std::make_unique<ClampExpression>();
+  //To review: this isn't exposed to UI (it was added by merge with master)
+  //if (name == "minus")
+  //  return std::make_unique<UnaryMinusExpression>();
   if (name == "pow")
     return std::make_unique<PowExpression>();
   if (name == "sqrt")
@@ -1077,9 +1036,6 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<ATanExpression>();
   if (name == "atan2")
     return std::make_unique<ATan2Expression>();
-  //To review: this isn't exposed to UI (it was added by merge with master)
-  if (name == "minus")
-    return std::make_unique<UnaryMinusExpression>();
   // State/time based:
   if (name == "onPress")
     return std::make_unique<OnPressExpression>();
