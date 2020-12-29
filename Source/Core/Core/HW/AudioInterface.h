@@ -26,6 +26,8 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base);
 // Get the audio rates (48000 and 32000 for Wii, or ~48043 and ~32029 for GC)
 double GetAIDSampleRate();
 double GetAISSampleRate();
+double Get32KHzSampleRate();
+double Get48KHzSampleRate();
 
 void GenerateAISInterrupt();
 

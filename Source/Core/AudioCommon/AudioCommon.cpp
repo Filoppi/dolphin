@@ -16,6 +16,7 @@
 #include "Common/Logging/Log.h"
 #include "Common/ScopeGuard.h"
 #include "Core/ConfigManager.h"
+#include "Core/HW/AudioInterface.h"
 
 #ifdef _WIN32
 #include <Audioclient.h>
@@ -69,16 +70,16 @@ void InitSoundStream()
 
     if (!g_sound_stream)
     {
-      WARN_LOG(AUDIO, "Unknown backend %s, using %s instead (default)", backend.c_str(),
-               GetDefaultSoundBackend().c_str());
+      WARN_LOG_FMT(AUDIO, "Unknown backend {}, using {} instead (default)", backend,
+               GetDefaultSoundBackend());
       backend = GetDefaultSoundBackend();
       g_sound_stream = CreateSoundStreamForBackend(backend);
     }
 
     if (!g_sound_stream || !g_sound_stream->Init())
     {
-      WARN_LOG(AUDIO, "Could not initialize backend %s, using %s instead", backend.c_str(),
-               NullSound::GetName().c_str());
+      WARN_LOG_FMT(AUDIO, "Could not initialize backend {}, using {} instead", backend,
+               NullSound::GetName());
       g_sound_stream = std::make_unique<NullSound>();
       g_sound_stream->Init();  // NullSound can't fail
       g_selected_sound_stream_failed = true;
@@ -93,13 +94,20 @@ void InitSoundStream()
   // and true again, so basically the backend is "restarted" with every emulation state change
   SetSoundStreamRunning(true, true);
 
+  //To review: this was added after merge with master
+  // Ideally these two calls would be done in AudioInterface::Init so that we don't
+  // need to have a dependency on AudioInterface here, but this has to be done
+  // after creating g_sound_stream (above) and before starting audio dumping (below)
+  g_sound_stream->GetMixer()->SetDMAInputSampleRate(AudioInterface::GetAIDSampleRate());
+  g_sound_stream->GetMixer()->SetStreamInputSampleRate(AudioInterface::GetAISSampleRate());
+
   if (SConfig::GetInstance().m_DumpAudio && !s_audio_dump_started)
     StartAudioDump();
 }
 
 void ShutdownSoundStream()
 {
-  INFO_LOG(AUDIO, "Shutting down sound stream");
+  INFO_LOG_FMT(AUDIO, "Shutting down sound stream");
 
   if (SConfig::GetInstance().m_DumpAudio && s_audio_dump_started)
     StopAudioDump();
@@ -112,7 +120,7 @@ void ShutdownSoundStream()
     s_sound_stream_running = false;  // Force this off in case the backend failed to stop
   }
 
-  INFO_LOG(AUDIO, "Done shutting down sound stream");
+  INFO_LOG_FMT(AUDIO, "Done shutting down sound stream");
 }
 
 std::string GetDefaultSoundBackend()
@@ -387,9 +395,9 @@ bool SetSoundStreamRunning(bool running, bool send_error)
   if (send_error)
   {
     if (running)
-      ERROR_LOG(AUDIO, "Error starting stream");
+      ERROR_LOG_FMT(AUDIO, "Error starting stream");
     else
-      ERROR_LOG(AUDIO, "Error stopping stream");
+      ERROR_LOG_FMT(AUDIO, "Error stopping stream");
   }
   return false;
 }

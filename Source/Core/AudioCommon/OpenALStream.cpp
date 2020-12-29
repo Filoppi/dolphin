@@ -98,17 +98,17 @@ bool OpenALStream::Init()
 {
   if (!palcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT"))
   {
-    PanicAlertT("OpenAL: can't find sound devices");
+    PanicAlertFmtT("OpenAL: can't find sound devices");
     return false;
   }
 
   const char* default_device_dame = palcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER);
-  INFO_LOG(AUDIO, "Found OpenAL device %s", default_device_dame);
+  INFO_LOG_FMT(AUDIO, "Found OpenAL device {}", default_device_dame);
 
   ALCdevice* device = palcOpenDevice(default_device_dame);
   if (!device)
   {
-    PanicAlertT("OpenAL: can't open device %s", default_device_dame);
+    PanicAlertFmtT("OpenAL: can't open device {0}", default_device_dame);
     return false;
   }
 
@@ -116,7 +116,7 @@ bool OpenALStream::Init()
   if (!context)
   {
     palcCloseDevice(device);
-    PanicAlertT("OpenAL: can't create context for device %s", default_device_dame);
+    PanicAlertFmtT("OpenAL: can't create context for device {0}", default_device_dame);
     return false;
   }
 
@@ -224,7 +224,7 @@ static ALenum CheckALError(const char* desc)
       break;
     }
 
-    ERROR_LOG(AUDIO, "Error %s: %08x %s", desc, err, type.c_str());
+    ERROR_LOG_FMT(AUDIO, "Error {}: {:08x} {}", desc, err, type);
   }
 
   return err;
@@ -254,8 +254,8 @@ void OpenALStream::SoundLoop()
   if (frames_per_buffer > OAL_MAX_FRAMES)
     frames_per_buffer = OAL_MAX_FRAMES;
 
-  INFO_LOG(AUDIO, "Using %d buffers, each with %d audio frames for a total of %d.", OAL_BUFFERS,
-           frames_per_buffer, frames_per_buffer * OAL_BUFFERS);
+  INFO_LOG_FMT(AUDIO, "Using {} buffers, each with {} audio frames for a total of {}.", OAL_BUFFERS,
+               frames_per_buffer, frames_per_buffer * OAL_BUFFERS);
 
   // Should we make these larger just in case the mixer ever sends more samples
   // than what we request?
@@ -361,7 +361,7 @@ void OpenALStream::SoundLoop()
       if (err == AL_INVALID_ENUM)
       {
         // 5.1 is not supported by the host, fallback to stereo in the next audio frame
-        WARN_LOG(AUDIO, "Unable to set 5.1 surround mode, falling back to 2.0. Updating OpenAL "
+        WARN_LOG_FMT(AUDIO, "Unable to set 5.1 surround mode, falling back to 2.0. Updating OpenAL "
                         "Soft might fix this issue.");
         m_use_surround = false;
       }

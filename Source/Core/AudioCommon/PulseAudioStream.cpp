@@ -20,7 +20,7 @@ bool PulseAudio::Init()
   m_stereo = !SConfig::GetInstance().ShouldUseDPL2Decoder();
   m_channels = m_stereo ? 2 : 6;  // will tell PA we use a Stereo or 5.0 channel setup
 
-  NOTICE_LOG(AUDIO, "PulseAudio backend using %d channels", m_channels);
+  NOTICE_LOG_FMT(AUDIO, "PulseAudio backend using {} channels", m_channels);
 
   if (PulseInit())
   {
@@ -58,7 +58,7 @@ void PulseAudio::SoundLoop()
     m_pa_error = pa_mainloop_iterate(m_pa_ml, 1, nullptr);
 
   if (m_pa_error < 0)
-    ERROR_LOG(AUDIO, "PulseAudio error: %s", pa_strerror(m_pa_error));
+    ERROR_LOG_FMT(AUDIO, "PulseAudio error: {}", pa_strerror(m_pa_error));
 
   PulseShutdown();
 }
@@ -83,7 +83,7 @@ bool PulseAudio::PulseInit()
 
   if (m_pa_connected == 2 || m_pa_error < 0)
   {
-    ERROR_LOG(AUDIO, "PulseAudio failed to initialize: %s", pa_strerror(m_pa_error));
+    ERROR_LOG_FMT(AUDIO, "PulseAudio failed to initialize: {}", pa_strerror(m_pa_error));
     return false;
   }
 
@@ -162,12 +162,12 @@ bool PulseAudio::PulseInit()
 
     if (m_pa_error < 0)
     {
-      ERROR_LOG(AUDIO, "PulseAudio failed to initialize (2.0): %s", pa_strerror(m_pa_error));
+      ERROR_LOG_FMT(AUDIO, "PulseAudio failed to initialize (2.0): {}", pa_strerror(m_pa_error));
       return false;
     }
   }
 
-  INFO_LOG(AUDIO, "PulseAudio successfully initialized");
+  INFO_LOG_FMT(AUDIO, "PulseAudio successfully initialized");
   return true;
 }
 
@@ -229,7 +229,7 @@ void PulseAudio::UnderflowCallback(pa_stream* s)
   pa_operation* op = pa_stream_set_buffer_attr(s, &m_pa_ba, nullptr, nullptr);
   pa_operation_unref(op);
 
-  WARN_LOG(AUDIO, "PulseAudio underflow, new latency: %d bytes", m_pa_ba.tlength);
+  WARN_LOG_FMT(AUDIO, "PulseAudio underflow, new latency: {} bytes", m_pa_ba.tlength);
 }
 
 void PulseAudio::WriteCallback(pa_stream* s, size_t length)

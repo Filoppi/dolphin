@@ -7,6 +7,7 @@ add_library(core
   ARDecrypt.h
   BootManager.cpp
   BootManager.h
+  CheatCodes.h
   CommonTitles.h
   ConfigManager.cpp
   ConfigManager.h
@@ -16,6 +17,10 @@ add_library(core
   CoreTiming.h
   DSPEmulator.cpp
   DSPEmulator.h
+  FreeLookConfig.cpp
+  FreeLookConfig.h
+  FreeLookManager.cpp
+  FreeLookManager.h
   GeckoCodeConfig.cpp
   GeckoCodeConfig.h
   GeckoCode.cpp
@@ -37,8 +42,11 @@ add_library(core
   PatchEngine.h
   State.cpp
   State.h
+  SyncIdentifier.h
   SysConf.cpp
   SysConf.h
+  System.cpp
+  System.h
   TitleDatabase.cpp
   TitleDatabase.h
   WiiRoot.cpp
@@ -54,6 +62,8 @@ add_library(core
   Boot/ElfReader.cpp
   Boot/ElfReader.h
   Boot/ElfTypes.h
+  Config/FreeLookSettings.cpp
+  Config/FreeLookSettings.h
   Config/GraphicsSettings.cpp
   Config/GraphicsSettings.h
   Config/MainSettings.cpp
@@ -79,6 +89,8 @@ add_library(core
   Debugger/Dump.cpp
   Debugger/Dump.h
   Debugger/GCELF.h
+  Debugger/OSThread.cpp
+  Debugger/OSThread.h
   Debugger/PPCDebugInterface.cpp
   Debugger/PPCDebugInterface.h
   Debugger/RSO.cpp
@@ -99,23 +111,18 @@ add_library(core
   DSP/DSPDisassembler.cpp
   DSP/DSPDisassembler.h
   DSP/DSPHWInterface.cpp
-  DSP/DSPHWInterface.h
   DSP/DSPMemoryMap.cpp
-  DSP/DSPMemoryMap.h
   DSP/DSPStacks.cpp
-  DSP/DSPStacks.h
   DSP/DSPTables.cpp
   DSP/DSPTables.h
   DSP/LabelMap.cpp
   DSP/LabelMap.h
   DSP/Interpreter/DSPIntArithmetic.cpp
   DSP/Interpreter/DSPIntBranch.cpp
-  DSP/Interpreter/DSPIntCCUtil.cpp
   DSP/Interpreter/DSPIntCCUtil.h
   DSP/Interpreter/DSPInterpreter.cpp
   DSP/Interpreter/DSPInterpreter.h
   DSP/Interpreter/DSPIntExtOps.cpp
-  DSP/Interpreter/DSPIntExtOps.h
   DSP/Interpreter/DSPIntLoadStore.cpp
   DSP/Interpreter/DSPIntMisc.cpp
   DSP/Interpreter/DSPIntMultiplier.cpp
@@ -174,8 +181,6 @@ add_library(core
   HW/DSPHLE/MailHandler.h
   HW/DSPHLE/DSPHLE.cpp
   HW/DSPHLE/DSPHLE.h
-  HW/DSPLLE/DSPDebugInterface.cpp
-  HW/DSPLLE/DSPDebugInterface.h
   HW/DSPLLE/DSPHost.cpp
   HW/DSPLLE/DSPSymbols.cpp
   HW/DSPLLE/DSPSymbols.h
@@ -554,12 +559,12 @@ PUBLIC
   inputcommon
   ${MBEDTLS_LIBRARIES}
   pugixml
+  RangeSet::RangeSet
   sfml-network
   sfml-system
   videonull
   videoogl
   videosoftware
-  videovulkan
 
 PRIVATE
   fmt::fmt
@@ -579,6 +584,11 @@ if (APPLE)
     ${IOB_LIBRARY}
     ${IOK_LIBRARY}
   )
+elseif (ANDROID)
+  target_link_libraries(core
+  PRIVATE
+    androidcommon
+  )
 endif()
 
 if(LIBUSB_FOUND)
@@ -590,6 +600,10 @@ if(LIBUSB_FOUND)
     IOS/USB/Bluetooth/BTReal.cpp
     IOS/USB/Bluetooth/BTReal.h
   )
+endif()
+
+if(ENABLE_VULKAN)
+  target_link_libraries(core PUBLIC videovulkan)
 endif()
 
 if(WIN32)
@@ -610,6 +624,7 @@ if(WIN32)
 elseif(APPLE)
   target_sources(core PRIVATE
     HW/EXI/BBA/TAP_Apple.cpp
+    HW/EXI/BBA/TAPServer_Apple.cpp
     HW/EXI/BBA/XLINK_KAI_BBA.cpp
     HW/WiimoteReal/IOdarwin.h
     HW/WiimoteReal/IOdarwin_private.h
@@ -634,7 +649,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
   option(ENABLE_BLUEZ "Enables bluetooth support" ON)
   if(ENABLE_BLUEZ)
     find_package(BlueZ)
-    if(BLUEZ_FOUND)
+    if(BlueZ_FOUND)
       message(STATUS "BlueZ found, enabling bluetooth support")
       target_sources(core PRIVATE
         HW/WiimoteReal/IOLinux.cpp

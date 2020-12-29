@@ -42,7 +42,9 @@ public:
     // Wii
     MAPPING_WIIMOTE_EMU,
     // Hotkeys
-    MAPPING_HOTKEYS
+    MAPPING_HOTKEYS,
+    // Freelook
+    MAPPING_FREELOOK,
   };
 
   explicit MappingWindow(QWidget* parent, Type type, int port_num);
@@ -71,10 +73,14 @@ private:
 
   void RefreshDevices();
 
+  void OnSelectProfile(int index);
+  void OnProfileTextChanged(const QString& text);
   void OnDeleteProfilePressed();
   void OnLoadProfilePressed();
   void OnSaveProfilePressed();
   void UpdateProfileIndex();
+  void UpdateProfileButtonState();
+  void PopulateProfileSelection();
 
   void OnDefaultFieldsPressed();
   void OnClearFieldsPressed();

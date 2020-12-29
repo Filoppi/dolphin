@@ -21,8 +21,8 @@
 
 namespace ControllerEmu
 {
-Cursor::Cursor(std::string name, std::string ui_name)
-    : ReshapableInput(std::move(name), std::move(ui_name), GroupType::Cursor), m_last_update{
+Cursor::Cursor(std::string name_, std::string ui_name_)
+    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor), m_last_update{
                                                                                    Clock::now(),
                                                                                    Clock::now()}
 {
@@ -34,8 +34,7 @@ Cursor::Cursor(std::string name, std::string ui_name)
 
   AddInput(Translate, _trans("Relative Input Hold"));
 
-  // Default values are optimized for "Super Mario Galaxy 2".
-  // This seems to be acceptable for a good number of games.
+  // Default values chosen to reach screen edges in most games including the Wii Menu.
 
   AddSetting(&m_vertical_offset_setting,
              // i18n: Refers to a positional offset applied to an emulated wiimote.
@@ -51,7 +50,7 @@ Cursor::Cursor(std::string name, std::string ui_name)
               _trans("°"),
               // i18n: Refers to emulated wii remote movements.
               _trans("Total rotation about the yaw axis.")},
-             14.65, 0, 360);
+             25, 0, 360);
 
   AddSetting(&m_pitch_setting,
              // i18n: Refers to an amount of rotational movement about the "pitch" axis.
@@ -60,7 +59,7 @@ Cursor::Cursor(std::string name, std::string ui_name)
               _trans("°"),
               // i18n: Refers to emulated wii remote movements.
               _trans("Total rotation about the pitch axis.")},
-             13.25, 0, 360);
+             20, 0, 360);
 
   AddSetting(&m_relative_setting, {_trans("Relative Input")}, false);
   NumericSetting<bool>* edit_condition =

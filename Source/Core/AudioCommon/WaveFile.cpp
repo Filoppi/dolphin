@@ -9,6 +9,7 @@
 #include "Common/CommonTypes.h"
 #include "Common/File.h"
 #include "Common/FileUtil.h"
+#include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
 #include "Common/StringUtil.h"
 #include "Common/Swap.h"
@@ -31,7 +32,7 @@ bool WaveFileWriter::Start(const std::string& file_name, u32 sample_rate)
   if (File::Exists(file_name))
   {
     if (SConfig::GetInstance().m_DumpAudioSilent ||
-        AskYesNoT("Delete the existing file '%s'?", file_name.c_str()))
+        AskYesNoFmtT("Delete the existing file '{0}'?", file_name))
     {
       File::Delete(file_name);
     }
@@ -45,17 +46,16 @@ bool WaveFileWriter::Start(const std::string& file_name, u32 sample_rate)
   // Check if the file is already open
   if (file)
   {
-    PanicAlertT("The file %s was already open, the file header will not be written.",
-                file_name.c_str());
+    PanicAlertFmtT("The file {0} was already open, the file header will not be written.",
+                file_name);
     return false;
   }
 
   file.Open(file_name, "wb");
   if (!file)
   {
-    PanicAlertT("The file %s could not be opened for writing. Please check if it's already opened "
-                "by another program.",
-                file_name.c_str());
+    PanicAlertFmtT("The file {0} could not be opened for writing. Please check if it's already "
+                "opened by another program.", file_name);
     return false;
   }
 
@@ -86,7 +86,7 @@ bool WaveFileWriter::Start(const std::string& file_name, u32 sample_rate)
 
   // We are now at offset 44
   if (file.Tell() != 44)
-    PanicAlert("Wrong offset: %lld", (long long)file.Tell());
+    PanicAlertFmt("Wrong offset: {}", file.Tell());
 
   return true;
 }
@@ -116,10 +116,10 @@ void WaveFileWriter::Write4(const char* ptr)
 void WaveFileWriter::AddStereoSamplesBE(const short* sample_data, u32 count, u32 sample_rate)
 {
   if (!file)
-    PanicAlertT("WaveFileWriter - file not open.");
+    ERROR_LOG_FMT(AUDIO, "WaveFileWriter - file not open.");
 
   if (count > BUFFER_SIZE / 2)
-    PanicAlert("WaveFileWriter - buffer too small (count = %u).", count);
+    ERROR_LOG_FMT(AUDIO, "WaveFileWriter - buffer too small (count = {}).", count);
 
   if (skip_silence)
   {

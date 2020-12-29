@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -130,6 +131,11 @@ public:
     virtual ControlState GetState() const = 0;
 
     Input* ToInput() override { return this; }
+	
+    // Overridden by CombinedInput,
+    // so hotkey logic knows Ctrl, L_Ctrl, and R_Ctrl are the same,
+    // and so input detection can return the parent name.
+    virtual bool IsChild(const Input*) const { return false; }
 
 protected:
     InputChannel GetCurrentInputChannel() const;
@@ -223,6 +229,8 @@ protected:
   const std::vector<Input*>& Inputs() const { return m_inputs; }
   const std::vector<Output*>& Outputs() const { return m_outputs; }
 
+  Input* GetParentMostInput(Input* input) const;
+
   Input* FindInput(std::string_view name) const;
   Output* FindOutput(std::string_view name) const;
 
@@ -250,6 +258,8 @@ protected:
     AddInput(new FullAnalogSurface(low, high));
     AddInput(new FullAnalogSurface(high, low));
   }
+
+  void AddCombinedInput(std::string name, const std::pair<std::string, std::string>& inputs);
 
 private:
   int m_id;
@@ -289,6 +299,17 @@ public:
 class DeviceContainer
 {
 public:
+  using Clock = std::chrono::steady_clock;
+
+  struct InputDetection
+  {
+    std::shared_ptr<Device> device;
+    Device::Input* input;
+    Clock::time_point press_time;
+    std::optional<Clock::time_point> release_time;
+    ControlState smoothness;
+  };
+
   Device::Input* FindInput(std::string_view name, const Device* def_dev) const;
   Device::Output* FindOutput(std::string_view name, const Device* def_dev) const;
 
@@ -298,8 +319,10 @@ public:
 
   bool HasConnectedDevice(const DeviceQualifier& qualifier) const;
 
-  std::pair<std::shared_ptr<Device>, Device::Input*>
-  DetectInput(u32 wait_ms, const std::vector<std::string>& device_strings) const;
+  std::vector<InputDetection> DetectInput(const std::vector<std::string>& device_strings,
+                                          std::chrono::milliseconds initial_wait,
+                                          std::chrono::milliseconds confirmation_wait,
+                                          std::chrono::milliseconds maximum_wait) const;
 
 protected:
   mutable std::recursive_mutex m_devices_mutex;

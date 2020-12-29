@@ -1,46 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|ARM64">
-      <Configuration>Debug</Configuration>
-      <Platform>ARM64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug|x64">
-      <Configuration>Debug</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|ARM64">
-      <Configuration>Release</Configuration>
-      <Platform>ARM64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|x64">
-      <Configuration>Release</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
-  </ItemGroup>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\VSProps\Base.Macros.props" />
+  <Import Project="$(VSPropsDir)Base.Targets.props" />
   <PropertyGroup Label="Globals">
     <ProjectGuid>{E54CF649-140E-4255-81A5-30A673C1FB36}</ProjectGuid>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
-    <UseDebugLibraries>true</UseDebugLibraries>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
-    <UseDebugLibraries>false</UseDebugLibraries>
-  </PropertyGroup>
+  <Import Project="$(VSPropsDir)Configuration.StaticLibrary.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\..\VSProps\Base.props" />
-    <Import Project="..\..\VSProps\PCHUse.props" />
+    <Import Project="$(VSPropsDir)Base.props" />
+    <Import Project="$(VSPropsDir)PCHUse.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
@@ -53,6 +25,7 @@
     <ClCompile Include="Boot\Boot_WiiWAD.cpp" />
     <ClCompile Include="Boot\DolReader.cpp" />
     <ClCompile Include="Boot\ElfReader.cpp" />
+    <ClCompile Include="Config\FreeLookSettings.cpp" />
     <ClCompile Include="Config\GraphicsSettings.cpp" />
     <ClCompile Include="Config\MainSettings.cpp" />
     <ClCompile Include="Config\NetplaySettings.cpp" />
@@ -68,6 +41,7 @@
     <ClCompile Include="CoreTiming.cpp" />
     <ClCompile Include="Debugger\Debugger_SymbolMap.cpp" />
     <ClCompile Include="Debugger\Dump.cpp" />
+    <ClCompile Include="Debugger\OSThread.cpp" />
     <ClCompile Include="Debugger\PPCDebugInterface.cpp" />
     <ClCompile Include="Debugger\RSO.cpp" />
     <ClCompile Include="DSPEmulator.cpp" />
@@ -84,7 +58,6 @@
     <ClCompile Include="DSP\DSPTables.cpp" />
     <ClCompile Include="DSP\Interpreter\DSPIntArithmetic.cpp" />
     <ClCompile Include="DSP\Interpreter\DSPIntBranch.cpp" />
-    <ClCompile Include="DSP\Interpreter\DSPIntCCUtil.cpp" />
     <ClCompile Include="DSP\Interpreter\DSPInterpreter.cpp" />
     <ClCompile Include="DSP\Interpreter\DSPIntExtOps.cpp" />
     <ClCompile Include="DSP\Interpreter\DSPIntLoadStore.cpp" />
@@ -110,6 +83,8 @@
     <ClCompile Include="FifoPlayer\FifoPlayer.cpp" />
     <ClCompile Include="FifoPlayer\FifoRecordAnalyzer.cpp" />
     <ClCompile Include="FifoPlayer\FifoRecorder.cpp" />
+    <ClCompile Include="FreeLookConfig.cpp" />
+    <ClCompile Include="FreeLookManager.cpp" />
     <ClCompile Include="GeckoCode.cpp" />
     <ClCompile Include="GeckoCodeConfig.cpp" />
     <ClCompile Include="HLE\HLE.cpp" />
@@ -131,7 +106,6 @@
     <ClCompile Include="HW\DSPHLE\UCodes\INIT.cpp" />
     <ClCompile Include="HW\DSPHLE\UCodes\ROM.cpp" />
     <ClCompile Include="HW\DSPHLE\UCodes\Zelda.cpp" />
-    <ClCompile Include="HW\DSPLLE\DSPDebugInterface.cpp" />
     <ClCompile Include="HW\DSPLLE\DSPHost.cpp" />
     <ClCompile Include="HW\DSPLLE\DSPLLE.cpp" />
     <ClCompile Include="HW\DSPLLE\DSPLLEGlobals.cpp" />
@@ -239,15 +213,9 @@
     <ClCompile Include="IOS\SDIO\SDIOSlot0.cpp" />
     <ClCompile Include="IOS\STM\STM.cpp" />
     <ClCompile Include="IOS\USB\Common.cpp" />
-    <ClCompile Include="IOS\USB\LibusbDevice.cpp">
-      <DisableSpecificWarnings>4200;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
-    <ClCompile Include="LibusbUtils.cpp">
-      <DisableSpecificWarnings>4200;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
-    <ClCompile Include="IOS\USB\Host.cpp">
-      <DisableSpecificWarnings>4200;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
+    <ClCompile Include="IOS\USB\LibusbDevice.cpp" />
+    <ClCompile Include="LibusbUtils.cpp" />
+    <ClCompile Include="IOS\USB\Host.cpp" />
     <ClCompile Include="IOS\USB\OH0\OH0.cpp" />
     <ClCompile Include="IOS\USB\OH0\OH0Device.cpp" />
     <ClCompile Include="IOS\USB\USB_HID\HIDv4.cpp" />
@@ -260,9 +228,7 @@
     <ClCompile Include="IOS\USB\Bluetooth\BTBase.cpp" />
     <ClCompile Include="IOS\USB\Bluetooth\BTEmu.cpp" />
     <ClCompile Include="IOS\USB\Bluetooth\BTStub.cpp" />
-    <ClCompile Include="IOS\USB\Bluetooth\BTReal.cpp">
-      <DisableSpecificWarnings>4200;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
+    <ClCompile Include="IOS\USB\Bluetooth\BTReal.cpp" />
     <ClCompile Include="IOS\USB\Bluetooth\WiimoteDevice.cpp" />
     <ClCompile Include="IOS\USB\Bluetooth\WiimoteHIDAttr.cpp" />
     <ClCompile Include="IOS\WFS\WFSI.cpp" />
@@ -406,6 +372,7 @@
     <ClCompile Include="PowerPC\SignatureDB\SignatureDB.cpp" />
     <ClCompile Include="State.cpp" />
     <ClCompile Include="SysConf.cpp" />
+    <ClCompile Include="System.cpp" />
     <ClCompile Include="TitleDatabase.cpp" />
     <ClCompile Include="WiiRoot.cpp" />
     <ClCompile Include="WiiUtils.cpp" />
@@ -419,6 +386,8 @@
     <ClInclude Include="Boot\DolReader.h" />
     <ClInclude Include="Boot\ElfReader.h" />
     <ClInclude Include="Boot\ElfTypes.h" />
+    <ClInclude Include="CheatCodes.h" />
+    <ClInclude Include="Config\FreeLookSettings.h" />
     <ClInclude Include="Config\GraphicsSettings.h" />
     <ClInclude Include="Config\MainSettings.h" />
     <ClInclude Include="Config\NetplaySettings.h" />
@@ -435,6 +404,7 @@
     <ClInclude Include="Debugger\Debugger_SymbolMap.h" />
     <ClInclude Include="Debugger\Dump.h" />
     <ClInclude Include="Debugger\GCELF.h" />
+    <ClInclude Include="Debugger\OSThread.h" />
     <ClInclude Include="Debugger\PPCDebugInterface.h" />
     <ClInclude Include="Debugger\RSO.h" />
     <ClInclude Include="DSPEmulator.h" />
@@ -448,13 +418,9 @@
     <ClInclude Include="DSP\DSPCore.h" />
     <ClInclude Include="DSP\DSPDisassembler.h" />
     <ClInclude Include="DSP\DSPHost.h" />
-    <ClInclude Include="DSP\DSPHWInterface.h" />
-    <ClInclude Include="DSP\DSPMemoryMap.h" />
-    <ClInclude Include="DSP\DSPStacks.h" />
     <ClInclude Include="DSP\DSPTables.h" />
     <ClInclude Include="DSP\Interpreter\DSPIntCCUtil.h" />
     <ClInclude Include="DSP\Interpreter\DSPInterpreter.h" />
-    <ClInclude Include="DSP\Interpreter\DSPIntExtOps.h" />
     <ClInclude Include="DSP\Interpreter\DSPIntTables.h" />
     <ClInclude Include="DSP\Interpreter\DSPIntUtil.h" />
     <ClInclude Include="DSP\Jit\DSPEmitterBase.h" />
@@ -468,6 +434,8 @@
     <ClInclude Include="FifoPlayer\FifoPlayer.h" />
     <ClInclude Include="FifoPlayer\FifoRecordAnalyzer.h" />
     <ClInclude Include="FifoPlayer\FifoRecorder.h" />
+    <ClInclude Include="FreeLookConfig.h" />
+    <ClInclude Include="FreeLookManager.h" />
     <ClInclude Include="GeckoCode.h" />
     <ClInclude Include="GeckoCodeConfig.h" />
     <ClInclude Include="HLE\HLE.h" />
@@ -492,7 +460,6 @@
     <ClInclude Include="HW\DSPHLE\UCodes\INIT.h" />
     <ClInclude Include="HW\DSPHLE\UCodes\ROM.h" />
     <ClInclude Include="HW\DSPHLE\UCodes\Zelda.h" />
-    <ClInclude Include="HW\DSPLLE\DSPDebugInterface.h" />
     <ClInclude Include="HW\DSPLLE\DSPLLE.h" />
     <ClInclude Include="HW\DSPLLE\DSPLLEGlobals.h" />
     <ClInclude Include="HW\DSPLLE\DSPSymbols.h" />
@@ -709,7 +676,9 @@
     <ClInclude Include="PowerPC\PPCTables.h" />
     <ClInclude Include="PowerPC\Profiler.h" />
     <ClInclude Include="State.h" />
+    <ClInclude Include="SyncIdentifier.h" />
     <ClInclude Include="SysConf.h" />
+    <ClInclude Include="System.h" />
     <ClInclude Include="Titles.h" />
     <ClInclude Include="TitleDatabase.h" />
     <ClInclude Include="WiiRoot.h" />
@@ -719,27 +688,6 @@
     <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="$(ExternalsDir)Bochs_disasm\Bochs_disasm.vcxproj">
-      <Project>{8ada04d7-6db1-4da4-ab55-64fb12a0997b}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)enet\enet.vcxproj">
-      <Project>{cbc76802-c128-4b17-bf6c-23b08c313e5e}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)libusb\libusb_static_2013.vcxproj">
-      <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)LZO\LZO.vcxproj">
-      <Project>{ab993f38-c31d-4897-b139-a620c42bc565}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)miniupnpc\miniupnpc.vcxproj">
-      <Project>{31643fdb-1bb8-4965-9de7-000fc88d35ae}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)mbedtls\mbedTLS.vcxproj">
-      <Project>{bdb6578b-0691-4e80-a46c-df21639fd3b8}</Project>
-    </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)SFML\build\vc2010\SFML_Network.vcxproj">
-      <Project>{93d73454-2512-424e-9cda-4bb357fe13dd}</Project>
-    </ProjectReference>
     <ProjectReference Include="$(CoreDir)AudioCommon\AudioCommon.vcxproj">
       <Project>{54aa7840-5beb-4a0c-9452-74ba4cc7fd44}</Project>
     </ProjectReference>
@@ -758,14 +706,35 @@
     <ProjectReference Include="$(CoreDir)VideoCommon\VideoCommon.vcxproj">
       <Project>{3de9ee35-3e91-4f27-a014-2866ad8c3fe3}</Project>
     </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)Bochs_disasm\Bochs_disasm.vcxproj">
+      <Project>{8ada04d7-6db1-4da4-ab55-64fb12a0997b}</Project>
+    </ProjectReference>
     <ProjectReference Include="$(ExternalsDir)cubeb\msvc\cubeb.vcxproj">
       <Project>{8ea11166-6512-44fc-b7a5-a4d1ecc81170}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)enet\enet.vcxproj">
+      <Project>{cbc76802-c128-4b17-bf6c-23b08c313e5e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)libusb\libusb_static_2013.vcxproj">
+      <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)LZO\LZO.vcxproj">
+      <Project>{ab993f38-c31d-4897-b139-a620c42bc565}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)miniupnpc\miniupnpc.vcxproj">
+      <Project>{31643fdb-1bb8-4965-9de7-000fc88d35ae}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)mbedtls\mbedTLS.vcxproj">
+      <Project>{bdb6578b-0691-4e80-a46c-df21639fd3b8}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(ExternalsDir)minizip\minizip.vcxproj">
+      <Project>{23114507-079a-4418-9707-cfa81a03ca99}</Project>
     </ProjectReference>
     <ProjectReference Include="$(ExternalsDir)pugixml\pugixml.vcxproj">
       <Project>{38fee76f-f347-484b-949c-b4649381cffb}</Project>
     </ProjectReference>
-    <ProjectReference Include="$(ExternalsDir)minizip\minizip.vcxproj">
-      <Project>{23114507-079a-4418-9707-cfa81a03ca99}</Project>
+    <ProjectReference Include="$(ExternalsDir)SFML\build\vc2010\SFML_Network.vcxproj">
+      <Project>{93d73454-2512-424e-9cda-4bb357fe13dd}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

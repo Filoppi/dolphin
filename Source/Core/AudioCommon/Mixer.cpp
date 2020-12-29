@@ -33,7 +33,7 @@ Mixer::Mixer(u32 sample_rate)
   m_min_latency = Config::Get(Config::MAIN_AUDIO_MIXER_MIN_LATENCY) / 1000.0;
   m_max_latency = Config::Get(Config::MAIN_AUDIO_MIXER_MAX_LATENCY) / 1000.0;
 
-  INFO_LOG(AUDIO, "Mixer is initialized");
+  INFO_LOG_FMT(AUDIO, "Mixer is initialized");
 
   m_on_state_changed_handle = Core::AddOnStateChangedCallback([this](Core::State state) {
     if (state == Core::State::Paused)
@@ -865,16 +865,16 @@ void Mixer::StartLogDTKAudio(const std::string& filename)
     if (success)
     {
       m_log_dtk_audio = true;
-      NOTICE_LOG(AUDIO, "Starting DTK Audio logging");
+      NOTICE_LOG_FMT(AUDIO, "Starting DTK Audio logging");
     }
     else
     {
-      NOTICE_LOG(AUDIO, "Unable to start DTK Audio logging");
+      NOTICE_LOG_FMT(AUDIO, "Unable to start DTK Audio logging");
     }
   }
   else
   {
-    WARN_LOG(AUDIO, "DTK Audio logging has already been started");
+    WARN_LOG_FMT(AUDIO, "DTK Audio logging has already been started");
   }
 }
 
@@ -884,11 +884,11 @@ void Mixer::StopLogDTKAudio()
   {
     m_log_dtk_audio = false;
     m_wave_writer_dtk.Stop();
-    NOTICE_LOG(AUDIO, "Stopping DTK Audio logging");
+    NOTICE_LOG_FMT(AUDIO, "Stopping DTK Audio logging");
   }
   else
   {
-    WARN_LOG(AUDIO, "DTK Audio logging has already been stopped");
+    WARN_LOG_FMT(AUDIO, "DTK Audio logging has already been stopped");
   }
 }
 
@@ -900,16 +900,16 @@ void Mixer::StartLogDSPAudio(const std::string& filename)
     if (success)
     {
       m_log_dsp_audio = true;
-      NOTICE_LOG(AUDIO, "Starting DSP Audio logging");
+      NOTICE_LOG_FMT(AUDIO, "Starting DSP Audio logging");
     }
     else
     {
-      NOTICE_LOG(AUDIO, "Unable to start DSP Audio logging");
+      NOTICE_LOG_FMT(AUDIO, "Unable to start DSP Audio logging");
     }
   }
   else
   {
-    WARN_LOG(AUDIO, "DSP Audio logging has already been started");
+    WARN_LOG_FMT(AUDIO, "DSP Audio logging has already been started");
   }
 }
 
@@ -919,11 +919,11 @@ void Mixer::StopLogDSPAudio()
   {
     m_log_dsp_audio = false;
     m_wave_writer_dsp.Stop();
-    NOTICE_LOG(AUDIO, "Stopping DSP Audio logging");
+    NOTICE_LOG_FMT(AUDIO, "Stopping DSP Audio logging");
   }
   else
   {
-    WARN_LOG(AUDIO, "DSP Audio logging has already been stopped");
+    WARN_LOG_FMT(AUDIO, "DSP Audio logging has already been stopped");
   }
 }
 

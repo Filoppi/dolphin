@@ -16,6 +16,7 @@ import org.dolphinemu.dolphinemu.R;
 import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag;
 import org.dolphinemu.dolphinemu.model.GameFileCache;
 import org.dolphinemu.dolphinemu.services.GameFileCacheService;
+import org.dolphinemu.dolphinemu.utils.AfterDirectoryInitializationRunner;
 
 public final class MainPresenter
 {
@@ -70,20 +71,8 @@ public final class MainPresenter
   {
     switch (itemId)
     {
-      case R.id.menu_settings_core:
-        mView.launchSettingsActivity(MenuTag.CONFIG);
-        return true;
-
-      case R.id.menu_settings_graphics:
-        mView.launchSettingsActivity(MenuTag.GRAPHICS);
-        return true;
-
-      case R.id.menu_settings_gcpad:
-        mView.launchSettingsActivity(MenuTag.GCPAD_TYPE);
-        return true;
-
-      case R.id.menu_settings_wiimote:
-        mView.launchSettingsActivity(MenuTag.WIIMOTE);
+      case R.id.menu_settings:
+        mView.launchSettingsActivity(MenuTag.SETTINGS);
         return true;
 
       case R.id.menu_refresh:
@@ -99,7 +88,7 @@ public final class MainPresenter
         return true;
 
       case R.id.menu_install_wad:
-        mView.launchInstallWAD();
+        new AfterDirectoryInitializationRunner().run(context, true, mView::launchInstallWAD);
         return true;
     }
 

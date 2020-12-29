@@ -72,7 +72,7 @@ bool CubebStream::CreateStream()
   // In samples. Max supported by cubeb is 96000 and min is 1 (in samples)
   u32 minimum_latency = 0;
   if (cubeb_get_min_latency(m_ctx.get(), &params, &minimum_latency) != CUBEB_OK)
-    ERROR_LOG(AUDIO, "Error getting minimum latency");
+    ERROR_LOG_FMT(AUDIO, "Error getting minimum latency");
 
   u32 final_latency = minimum_latency;
   if (SupportsCustomLatency())
@@ -80,7 +80,7 @@ bool CubebStream::CreateStream()
     const u32 target_latency = AudioCommon::GetUserTargetLatency() / 1000.0 * params.rate;
     final_latency = std::clamp(target_latency, minimum_latency, 96000u);
   }
-  INFO_LOG(AUDIO, "Latency: %u frames", final_latency);
+  INFO_LOG_FMT(AUDIO, "Latency: {} frames", final_latency);
 
   // Note that cubeb latency might not be fixed and could dynamically adjust when the audio thread
   // can't keep up with itself, especially when using its internal mixer.

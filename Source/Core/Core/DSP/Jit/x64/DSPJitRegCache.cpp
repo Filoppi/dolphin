@@ -11,7 +11,6 @@
 #include "Common/Logging/Log.h"
 
 #include "Core/DSP/DSPCore.h"
-#include "Core/DSP/DSPMemoryMap.h"
 #include "Core/DSP/Jit/x64/DSPEmitter.h"
 
 using namespace Gen;
@@ -835,14 +834,7 @@ void DSPJitRegCache::WriteReg(int dreg, OpArg arg)
       m_emitter.MOV(32, reg, Imm32(arg.Imm32()));
       break;
     case 8:
-      if ((u32)arg.Imm64() == arg.Imm64())
-      {
-        m_emitter.MOV(64, reg, Imm32((u32)arg.Imm64()));
-      }
-      else
-      {
-        m_emitter.MOV(64, reg, Imm64(arg.Imm64()));
-      }
+      m_emitter.MOV(64, reg, Imm64(arg.Imm64()));
       break;
     default:
       ASSERT_MSG(DSPLLE, 0, "unsupported memory size");
@@ -964,7 +956,7 @@ void DSPJitRegCache::GetXReg(X64Reg reg)
 {
   if (m_xregs[reg].guest_reg == DSP_REG_STATIC)
   {
-    ERROR_LOG(DSPLLE, "Trying to get statically used XReg %d", reg);
+    ERROR_LOG_FMT(DSPLLE, "Trying to get statically used XReg {}", reg);
     return;
   }
 
@@ -980,7 +972,7 @@ void DSPJitRegCache::PutXReg(X64Reg reg)
 {
   if (m_xregs[reg].guest_reg == DSP_REG_STATIC)
   {
-    ERROR_LOG(DSPLLE, "Trying to put statically used XReg %d", reg);
+    ERROR_LOG_FMT(DSPLLE, "Trying to put statically used XReg {}", reg);
     return;
   }
 

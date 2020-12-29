@@ -179,7 +179,7 @@ private:
   void Draw() override;
 
   ControllerEmu::IMUGyroscope& m_gyro_group;
-  Common::Matrix33 m_state = Common::Matrix33::Identity();
+  Common::Quaternion m_state = Common::Quaternion::Identity();
   Common::Vec3 m_previous_velocity = {};
   u32 m_stable_steps = 0;
 };
@@ -207,4 +207,5 @@ private:
   ControllerEmu::ReshapableInput::CalibrationData m_calibration_data;
   QTimer* m_informative_timer;
   std::optional<Common::DVec2> m_new_center;
+  Common::DVec2 m_prev_point;
 };
