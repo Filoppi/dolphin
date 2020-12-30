@@ -203,22 +203,42 @@ void RenderWidget::showFullScreen()
   emit SizeChanged(width() * dpr, height() * dpr);
 }
 
-// Lock the cursor within the window internal borders
+// Lock the cursor within the window/widget internal borders.
+// Ignores the rendered aspect ratio for now, from an emulation point of view, it would make sense
+// to clamp the cursor to the rendered portion of the widget, but it would just feel weird, also,
+// users can always change the shape of the widget.
 void RenderWidget::SetCursorLocked(bool locked)
 {
+  // It seems like QT doesn't scale the window frame correctly with some DPIs
+  // so it might happen that the locked cursor can be on the frame of the window, 
+  // being able to resize it, but that is a minor problem.
+  QRect absolute_rect = geometry();
+  if (parentWidget())
+  {
+    absolute_rect.moveTopLeft(parentWidget()->mapToGlobal(absolute_rect.topLeft()));
+  }
+  auto scale = devicePixelRatioF();
+  QPoint screen_offset = QPoint(0, 0);
+  if (window()->windowHandle() && window()->windowHandle()->screen())
+  {
+    screen_offset = window()->windowHandle()->screen()->geometry().topLeft();
+  }
+  absolute_rect.moveTopLeft(((absolute_rect.topLeft() - screen_offset) * scale) + screen_offset);
+  absolute_rect.setSize(absolute_rect.size() * scale);
+
   if (locked)
   {
 #ifdef _WIN32
     RECT rect;
-    rect.left = geometry().left();
-    rect.right = geometry().right();
-    rect.top = geometry().top();
-    rect.bottom = geometry().bottom();
+    rect.left = absolute_rect.left();
+    rect.right = absolute_rect.right();
+    rect.top = absolute_rect.top();
+    rect.bottom = absolute_rect.bottom();
 
     if (ClipCursor(&rect))
 #else
     // TODO: implement on other platforms. Probably XGrabPointer on Linux.
-    // The setting is hidden in QT if not implemented
+    // The setting is hidden in the UI if not implemented
     if (false)
 #endif
     {
@@ -248,10 +268,11 @@ void RenderWidget::SetCursorLocked(bool locked)
       }
 
       // Center the mouse in the window if it's still active
+      // Leave it where it was otherwise, e.g. a prompt has opened or we alt tabbed.
       if (isActiveWindow())
       {
-        cursor().setPos(geometry().left() + geometry().width() / 2,
-                        geometry().top() + geometry().height() / 2);
+        cursor().setPos(absolute_rect.left() + absolute_rect.width() / 2,
+                        absolute_rect.top() + absolute_rect.height() / 2);
       }
 
       // Show the cursor or the user won't know the mouse is now unlocked
@@ -383,6 +404,10 @@ bool RenderWidget::event(QEvent* event)
     emit SizeChanged(new_size.width() * dpr, new_size.height() * dpr);
     break;
   }
+  // Happens when we add/remove the widget from the main window instead of the dedicated one
+  case QEvent::ParentChange:
+    SetCursorLocked(false);
+    break;
   case QEvent::WindowStateChange:
     // Lock the mouse again when fullscreen changes (we might have missed some events)
     SetCursorLocked(m_cursor_locked || (isFullScreen() && Settings::Instance().GetLockCursor()));
@@ -390,8 +415,6 @@ bool RenderWidget::event(QEvent* event)
     break;
   case QEvent::Close:
     emit Closed();
-    break;
-  default:
     break;
   }
   return QWidget::event(event);

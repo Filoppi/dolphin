@@ -95,9 +95,8 @@ QTextCharFormat GetCommentCharFormat()
 }
 }  // namespace
 
-ControlExpressionSyntaxHighlighter::ControlExpressionSyntaxHighlighter(QTextDocument* parent,
-                                                                       bool is_input)
-    : QSyntaxHighlighter(parent), m_is_input(is_input)
+ControlExpressionSyntaxHighlighter::ControlExpressionSyntaxHighlighter(QTextDocument* parent)
+    : QSyntaxHighlighter(parent)
 {
 }
 
@@ -175,46 +174,11 @@ void ControlExpressionSyntaxHighlighter::highlightBlock(const QString&)
     ciface::ExpressionParser::RemoveInertTokens(&tokens);
     const auto parse_status = ciface::ExpressionParser::ParseTokens(tokens);
 
-    //To review: m_result_text is now defined previously, move the code that changes it below to the new location
-    //m_result_text->setText(
-    //    QString::fromStdString(parse_status.description.value_or(_trans("Success."))));
-
     if (ciface::ExpressionParser::ParseStatus::Successful != parse_status.status)
     {
       const auto token = *parse_status.token;
       set_block_format(int(token.string_position), int(token.string_length),
                        GetInvalidCharFormat());
-    }
-    else
-    {
-      std::string appended_flags = "";
-      // Show what kind of focus the epression wants if it's not the default, expected one.
-      // This information won't be used if the user doesn't block background input.
-      // This isn't able to read from actual input expressions as they haven't been initialized,
-      // but it reads from any other expression. Also, some InputReference types ignore focus
-      if (parse_status.expr)
-      {
-        Device::FocusFlags focus_flags = parse_status.expr->GetFocusFlags();
-        if (focus_flags != Device::FocusFlags::Default)
-        {
-          if (!m_is_input)
-          {
-            appended_flags = _trans(" Focus Settings ignored.");
-          }
-          // Flags in order of priority (don't report "errors" for mutually exclusive ones)
-          else if (u8(focus_flags) & u8(Device::FocusFlags::IgnoreFocus))
-          {
-            appended_flags = _trans(" Ignores Focus.");
-          }
-          else if ((u8(focus_flags) & u8(Device::FocusFlags::RequireFullFocus)) &&
-                   SConfig::GetInstance().bLockCursor)
-          {
-            appended_flags = _trans(" Requires Full Focus.");
-          }
-        }
-      }
-
-      //m_result_text->setText(m_result_text->text() + QString::fromStdString(appended_flags));
     }
   }
 }
@@ -295,7 +259,7 @@ void IOWindow::CreateMainLayout()
 
   m_expression_text = new QPlainTextEdit();
   m_expression_text->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-  new ControlExpressionSyntaxHighlighter(m_expression_text->document(), m_type == Type::Input);
+  new ControlExpressionSyntaxHighlighter(m_expression_text->document());
 
   m_operators_combo = new QComboBox();
   m_operators_combo->addItem(tr("Operators"));
@@ -321,8 +285,9 @@ void IOWindow::CreateMainLayout()
 
   m_functions_combo = new QComboBox(this);
   m_functions_combo->addItem(tr("Functions"));
+  // This might an empty unselectable whitespace at the end of the ComboBox selection
   m_functions_combo->insertSeparator(m_functions_combo->count());  // A separator is also an item
-  m_functions_parameters.push_back(QStringLiteral(""));            // Keep them aligned
+  m_functions_parameters.push_back(QStringLiteral(""));            // Keep the indexes aligned
   // Logic/Math:
   AddFunction("if");
   AddFunction("not");
@@ -697,7 +662,7 @@ void IOWindow::UpdateExpression(std::string new_expression, UpdateMode mode)
   else if (status != ciface::ExpressionParser::ParseStatus::Successful)
   {
     m_parse_text->SetShouldPaintStateIndicator(false);
-    m_parse_text->setText(tr("Invalid Expression."));
+    m_parse_text->setText(tr("Invalid Expression"));
   }
   else
   {

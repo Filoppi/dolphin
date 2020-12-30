@@ -808,11 +808,11 @@ bool MainWindow::RequestStop()
     return true;
   }
 
-  //To review: master used the condition "!m_rendering_to_main" instead of mine
-  QWidget* confirm_parent =
-      (m_render_widget->isActiveWindow() && !m_render_widget->isFullScreen()) ?
-          m_render_widget :
-          static_cast<QWidget*>(this);
+  bool rendered_widget_was_active =
+      m_render_widget->isActiveWindow() && !m_render_widget->isFullScreen();
+  QWidget* confirm_parent = (!m_rendering_to_main && rendered_widget_was_active) ?
+                                m_render_widget :
+                                static_cast<QWidget*>(this);
   bool was_cursor_locked = m_render_widget->IsCursorLocked();
 
   if (!m_render_widget->isFullScreen())
@@ -849,8 +849,9 @@ bool MainWindow::RequestStop()
         Core::SetState(state);
 
       // Return focus to the render window automatically
-      if (confirm_parent == m_render_widget)
+      if (rendered_widget_was_active)
       {
+        //To review
         // TODO: fix, this only works like 2 times out of 3
         m_render_widget->SetCursorLockedOnNextActivation(was_cursor_locked);
         m_render_widget->activateWindow();

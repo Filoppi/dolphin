@@ -39,7 +39,7 @@ class ControlExpressionSyntaxHighlighter final : public QSyntaxHighlighter
 {
   Q_OBJECT
 public:
-  explicit ControlExpressionSyntaxHighlighter(QTextDocument* parent, bool is_input);
+  explicit ControlExpressionSyntaxHighlighter(QTextDocument* parent);
 
 protected:
   void highlightBlock(const QString& text) final override;
