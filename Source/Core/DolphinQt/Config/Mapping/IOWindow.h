@@ -63,6 +63,7 @@ public:
   enum class Type
   {
     Input,
+    InputSetting,
     Output
   };
 
@@ -73,12 +74,13 @@ public:
 
 private:
   void CreateMainLayout();
+  void AddFunction(std::string function_name);
   void ConnectWidgets();
   void ConfigChanged();
   void Update();
 
   void OnDialogButtonPressed(QAbstractButton* button);
-  void OnDeviceChanged(const QString& device);
+  void OnDeviceChanged();
   void OnDetectButtonPressed();
   void OnTestButtonPressed();
   void OnRangeChanged(int range);
@@ -94,6 +96,7 @@ private:
   };
 
   void UpdateExpression(std::string new_expression, UpdateMode mode = UpdateMode::Normal);
+  void SaveRange();
 
   // Main Layout
   QVBoxLayout* m_main_layout;
@@ -115,6 +118,7 @@ private:
   // Input actions
   QPushButton* m_detect_button;
   QComboBox* m_functions_combo;
+  std::vector<QString> m_functions_parameters;
 
   // Output actions
   QPushButton* m_test_button;
@@ -130,6 +134,7 @@ private:
   ControlReference* m_reference;
   std::string m_original_expression;
   ControllerEmu::EmulatedController* m_controller;
+  ControlState m_range;
 
   ciface::Core::DeviceQualifier m_devq;
   Type m_type;
