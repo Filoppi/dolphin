@@ -33,10 +33,9 @@ public:
   ReshapeData GetReshapableState(bool adjusted) final override;
   ControlState GetGateRadiusAtAngle(double ang) const override;
 
-  // Also updates the state
-  StateData GetState(float absolute_time_elapsed, bool is_ui);
+  StateData GetState(bool update = false, float absolute_time_elapsed = -1.f);
 
-  void ResetState(bool is_ui);
+  void ResetState();
 
   // Yaw movement in radians.
   ControlState GetTotalYaw() const;
@@ -56,13 +55,15 @@ private:
   static constexpr double AUTO_HIDE_DEADZONE = 0.001;
 
   // Not adjusted by width/height/center.
-  StateData m_state[2];
-  StateData m_prev_result[2];
+  StateData m_state;
+  StateData m_prev_state;
+  // Includes auto hide, we need to keep the other states as auto hide would lose the values
+  StateData m_final_state;
 
-  int m_auto_hide_timer[2] = {AUTO_HIDE_MS, AUTO_HIDE_MS};
+  int m_auto_hide_timer = AUTO_HIDE_MS;
 
   using Clock = std::chrono::steady_clock;
-  Clock::time_point m_last_update[2];
+  Clock::time_point m_last_update;
 
   SettingValue<double> m_yaw_setting;
   SettingValue<double> m_pitch_setting;

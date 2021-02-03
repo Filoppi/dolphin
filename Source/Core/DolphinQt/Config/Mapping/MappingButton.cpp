@@ -19,12 +19,12 @@
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
-constexpr int SLIDER_TICK_COUNT = 100;
-
 // Escape ampersands and remove ticks
-static QString ToDisplayString(QString&& string)
+static QString RefToDisplayString(ControlReference* ref)
 {
-  return string.replace(QLatin1Char{'&'}, QStringLiteral("&&"))
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+  return QString::fromStdString(ref->GetExpression())
+      .replace(QLatin1Char{'&'}, QStringLiteral("&&"))
       .replace(QLatin1Char{'`'}, QString{});
 }
 
@@ -33,9 +33,10 @@ bool MappingButton::IsInput() const
   return m_reference->IsInput();
 }
 
-MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool indicator)
-    : ElidedButton(ToDisplayString(QString::fromStdString(ref->GetExpression()))), m_parent(parent),
-      m_reference(ref)
+MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool indicator,
+                             const QString& button_name)
+    : ElidedButton(RefToDisplayString(ref)), m_parent(parent), m_reference(ref),
+      m_button_name(button_name)
 {
   // Force all mapping buttons to stay at a minimal height.
   setFixedHeight(minimumSizeHint().height());
@@ -66,7 +67,8 @@ MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool 
 void MappingButton::AdvancedPressed()
 {
   IOWindow io(m_parent, m_parent->GetController(), m_reference,
-              m_reference->IsInput() ? IOWindow::Type::Input : IOWindow::Type::Output);
+              m_reference->IsInput() ? IOWindow::Type::Input : IOWindow::Type::Output,
+              m_button_name);
   io.exec();
 
   ConfigChanged();
@@ -85,7 +87,7 @@ void MappingButton::Clicked()
 
   QString expression;
 
-  if (m_parent->GetParent()->IsMappingAllDevices())
+  if (m_parent->GetParent()->IsDetectingAllDevices())
   {
     expression = MappingCommon::DetectExpression(this, g_controller_interface,
                                                  g_controller_interface.GetAllDeviceStrings(),
@@ -101,8 +103,11 @@ void MappingButton::Clicked()
   if (expression.isEmpty())
     return;
 
-  m_reference->SetExpression(expression.toStdString());
-  m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
+  {
+    const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+    m_reference->SetExpression(expression.toStdString());
+    m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
+  }
 
   ConfigChanged();
   m_parent->SaveSettings();
@@ -110,10 +115,14 @@ void MappingButton::Clicked()
 
 void MappingButton::Clear()
 {
-  m_reference->range = 100.0 / SLIDER_TICK_COUNT;
+  {
+    const auto lock = ControllerEmu::EmulatedController::GetStateLock();
 
-  m_reference->SetExpression("");
-  m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
+    m_reference->range = m_reference->default_range;
+
+    m_reference->SetExpression("");
+    m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
+  }
 
   m_parent->SaveSettings();
   ConfigChanged();
@@ -121,12 +130,10 @@ void MappingButton::Clear()
 
 void MappingButton::UpdateIndicator()
 {
-  if (!isActiveWindow())
-    return;
-
   QFont f = m_parent->font();
-
-  if (m_reference->GetState<bool>())
+  
+  // This won't detect all devices unless they have their path in front of them.
+  if (m_reference->IsInput() && m_reference->GetState<bool>())
     f.setBold(true);
 
   setFont(f);
@@ -134,7 +141,7 @@ void MappingButton::UpdateIndicator()
 
 void MappingButton::ConfigChanged()
 {
-  setText(ToDisplayString(QString::fromStdString(m_reference->GetExpression())));
+  setText(RefToDisplayString(m_reference));
 }
 
 void MappingButton::mouseReleaseEvent(QMouseEvent* event)

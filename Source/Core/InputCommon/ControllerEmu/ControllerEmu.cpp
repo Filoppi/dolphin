@@ -9,6 +9,7 @@
 #include <string>
 
 #include "Common/IniFile.h"
+#include "Common/Logging/Log.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
@@ -19,7 +20,11 @@
 
 namespace ControllerEmu
 {
-static std::recursive_mutex s_get_state_mutex;
+static std::recursive_mutex s_state_mutex;
+#ifdef _DEBUG
+static std::atomic<int> s_state_mutex_count;
+#endif
+static std::recursive_mutex s_devices_input_mutex;
 
 std::string EmulatedController::GetDisplayName() const
 {
@@ -28,12 +33,24 @@ std::string EmulatedController::GetDisplayName() const
 
 EmulatedController::~EmulatedController() = default;
 
-// This should be called before calling GetState() or State() on a control reference
-// to prevent a race condition.
-// This is a recursive mutex because UpdateReferences is recursive.
-std::unique_lock<std::recursive_mutex> EmulatedController::GetStateLock()
+RecursiveMutexCountedLockGuard EmulatedController::GetStateLock()
 {
-  std::unique_lock<std::recursive_mutex> lock(s_get_state_mutex);
+#ifdef _DEBUG
+  return std::move(RecursiveMutexCountedLockGuard(&s_state_mutex, &s_state_mutex_count));
+#else
+  return std::move(RecursiveMutexCountedLockGuard(&s_state_mutex, nullptr));
+#endif
+}
+void EmulatedController::EnsureStateLock()
+{
+#ifdef _DEBUG
+  if (s_state_mutex_count <= 0)
+    ERROR_LOG_FMT(CONTROLLERINTERFACE, "EmulatedController state mutex is not locked");
+#endif
+}
+std::unique_lock<std::recursive_mutex> EmulatedController::GetDevicesInputLock()
+{
+  std::unique_lock<std::recursive_mutex> lock(s_devices_input_mutex);
   return lock;
 }
 
@@ -75,12 +92,45 @@ void EmulatedController::UpdateSingleControlReference(const ControllerInterface&
                                                       ControlReference* ref)
 {
   ciface::ExpressionParser::ControlEnvironment env(devi, GetDefaultDevice(), m_expression_vars);
+  const auto lock = GetStateLock();
   ref->UpdateReference(env);
+}
+
+void EmulatedController::CacheInput()
+{
+  const auto state_lock = GetStateLock();
+  const auto devices_input_lock = GetDevicesInputLock();
+
+  for (auto& ctrlGroup : groups)
+  {
+    for (auto& control : ctrlGroup->controls)
+      control->control_ref->UpdateState();
+
+    for (auto& setting : ctrlGroup->numeric_settings)
+      setting->Update();
+
+    // Attachments:
+    if (ctrlGroup->type == GroupType::Attachments)
+    {
+      auto* const attachments = static_cast<Attachments*>(ctrlGroup.get());
+
+      // This is an extra numeric setting not included in the list of numeric_settings
+      attachments->GetSelectionSetting().Update();
+
+      // Only cache the currently selected attachment
+      attachments->GetAttachmentList()[attachments->GetSelectedAttachment()]->CacheInput();
+    }
+  }
 }
 
 bool EmulatedController::IsDefaultDeviceConnected() const
 {
   return m_default_device_is_connected;
+}
+
+bool EmulatedController::HasDefaultDevice() const
+{
+  return !m_default_device.ToString().empty();
 }
 
 const ciface::Core::DeviceQualifier& EmulatedController::GetDefaultDevice() const
@@ -114,6 +164,8 @@ void EmulatedController::SetDefaultDevice(ciface::Core::DeviceQualifier devq)
 
 void EmulatedController::LoadConfig(IniFile::Section* sec, const std::string& base)
 {
+  const auto lock = GetStateLock();
+
   std::string defdev = GetDefaultDevice().ToString();
   if (base.empty())
   {
@@ -127,6 +179,8 @@ void EmulatedController::LoadConfig(IniFile::Section* sec, const std::string& ba
 
 void EmulatedController::SaveConfig(IniFile::Section* sec, const std::string& base)
 {
+  const auto lock = GetStateLock();
+
   const std::string defdev = GetDefaultDevice().ToString();
   if (base.empty())
     sec->Set(/*std::string(" ") +*/ base + "Device", defdev, "");
@@ -137,6 +191,8 @@ void EmulatedController::SaveConfig(IniFile::Section* sec, const std::string& ba
 
 void EmulatedController::LoadDefaults(const ControllerInterface& ciface)
 {
+  const auto lock = GetStateLock();
+
   // load an empty inifile section, clears everything
   IniFile::Section sec;
   LoadConfig(&sec);

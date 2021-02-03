@@ -72,9 +72,9 @@ void ControlGroup::LoadConfig(IniFile::Section* sec, const std::string& defdev,
     }
 
     // range
-    sec->Get(group + c->name + "/Range", &c->control_ref->range,
-             c->control_ref->default_range * 100.0);
-    c->control_ref->range /= 100;
+    auto range = c->control_ref->range.load();
+    sec->Get(group + c->name + "/Range", &range, c->control_ref->default_range * 100.0);
+    c->control_ref->range = range / 100.0;
   }
 
   // extensions
@@ -83,14 +83,15 @@ void ControlGroup::LoadConfig(IniFile::Section* sec, const std::string& defdev,
     auto* const ext = static_cast<Attachments*>(this);
 
     ext->SetSelectedAttachment(0);
-    u32 n = 0;
     std::string attachment_text;
     sec->Get(base + name, &attachment_text, "");
 
     // First assume attachment string is a valid expression.
     // If it instead matches one of the names of our attachments it is overridden below.
+    // There is no need to re-simplify the NumericSetting.
     ext->GetSelectionSetting().GetInputReference().SetExpression(attachment_text);
 
+    u32 n = 0;
     for (auto& ai : ext->GetAttachmentList())
     {
       ai->SetDefaultDevice(defdev);
@@ -121,7 +122,8 @@ void ControlGroup::SaveConfig(IniFile::Section* sec, const std::string& defdev,
     sec->Set(group + c->name, c->control_ref->GetExpression(), "");
 
     // range
-    sec->Set(group + c->name + "/Range", c->control_ref->range * 100.0, 100.0);
+    sec->Set(group + c->name + "/Range", c->control_ref->range * 100.0,
+             c->control_ref->default_range);
   }
 
   // extensions
@@ -136,7 +138,7 @@ void ControlGroup::SaveConfig(IniFile::Section* sec, const std::string& defdev,
     }
     else
     {
-      sec->Set(base + name, ext->GetSelectionSetting().GetInputReference().GetExpression(), "None");
+      sec->Set(base + name, ext->GetSelectionSetting().GetInputReference().GetExpression(), "");
     }
 
     for (auto& ai : ext->GetAttachmentList())
@@ -151,24 +153,19 @@ void ControlGroup::SetControlExpression(int index, const std::string& expression
 
 void ControlGroup::AddInput(Translatability translate, std::string name_, ControlState range)
 {
-  controls.emplace_back(std::make_unique<Input>(translate, std::move(name_)));
-  controls.back().get()->control_ref->default_range = range;
-  controls.back().get()->control_ref->range = range;
+  controls.emplace_back(std::make_unique<Input>(translate, std::move(name_), range));
 }
 
 void ControlGroup::AddInput(Translatability translate, std::string name_, std::string ui_name_,
                             ControlState range)
 {
-  controls.emplace_back(std::make_unique<Input>(translate, std::move(name_), std::move(ui_name_)));
-  controls.back().get()->control_ref->default_range = range;
-  controls.back().get()->control_ref->range = range;
+  controls.emplace_back(
+      std::make_unique<Input>(translate, std::move(name_), std::move(ui_name_), range));
 }
 
 void ControlGroup::AddOutput(Translatability translate, std::string name_, ControlState range)
 {
-  controls.emplace_back(std::make_unique<Output>(translate, std::move(name_)));
-  controls.back().get()->control_ref->default_range = range;
-  controls.back().get()->control_ref->range = range;
+  controls.emplace_back(std::make_unique<Output>(translate, std::move(name_), range));
 }
 
 }  // namespace ControllerEmu

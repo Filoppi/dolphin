@@ -10,6 +10,7 @@
 #include "Common/MathUtil.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
+#include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
 #include "InputCommon/ControllerEmu/Control/Input.h"
 
@@ -39,7 +40,7 @@ IMUGyroscope::IMUGyroscope(std::string name_, std::string ui_name_)
               // i18n: "°/s" is the symbol for degrees (angular measurement) divided by seconds.
               _trans("°/s"),
               // i18n: Refers to the dead-zone setting of gyroscope input.
-              _trans("Angular velocity to ignore.")},
+              _trans("Angular velocity to ignore and remap.")},
              2, 0, 180);
 
   AddSetting(&m_calibration_period_setting,
@@ -51,13 +52,13 @@ IMUGyroscope::IMUGyroscope(std::string name_, std::string ui_name_)
              3, 0, 30);
 }
 
-void IMUGyroscope::RestartCalibration() const
+void IMUGyroscope::RestartCalibration()
 {
   m_calibration_period_start = Clock::now();
   m_running_calibration.Clear();
 }
 
-void IMUGyroscope::UpdateCalibration(const StateData& state) const
+void IMUGyroscope::UpdateCalibration(const StateData& state)
 {
   const auto now = Clock::now();
   const auto calibration_period = m_calibration_period_setting.GetValue();
@@ -122,20 +123,40 @@ auto IMUGyroscope::GetRawState() const -> StateData
                    controls[4]->GetState() - controls[5]->GetState());
 }
 
-std::optional<IMUGyroscope::StateData> IMUGyroscope::GetState() const
+bool IMUGyroscope::AreInputsBound() const
 {
-  if (controls[0]->control_ref->BoundCount() == 0)
+  return controls[0]->control_ref->BoundCount() && controls[1]->control_ref->BoundCount() &&
+         controls[2]->control_ref->BoundCount() && controls[3]->control_ref->BoundCount() &&
+         controls[4]->control_ref->BoundCount() && controls[5]->control_ref->BoundCount();
+}
+
+bool IMUGyroscope::CanCalibrate() const
+{
+  // Return true if all controls current pass the control gate (so their values would be correct),
+  // otherwise miscalibration to zero values could occur.
+  return controls[0]->control_ref->PassesGate() && controls[1]->control_ref->PassesGate() &&
+         controls[2]->control_ref->PassesGate() && controls[3]->control_ref->PassesGate() &&
+         controls[4]->control_ref->PassesGate() && controls[5]->control_ref->PassesGate();
+}
+
+std::optional<IMUGyroscope::StateData> IMUGyroscope::GetState(bool update)
+{
+  if (!AreInputsBound())
   {
-    // Set calibration to zero.
-    m_calibration = {};
-    RestartCalibration();
+    if (update)
+    {
+      // Set calibration to zero.
+      m_calibration = {};
+      RestartCalibration();
+    }
     return std::nullopt;
   }
 
   auto state = GetRawState();
 
-  // If the input gate is disabled, miscalibration to zero values would occur.
-  if (ControlReference::GetInputGate())
+  // Alternatively we could open the control gate around GetRawState() while calibrating,
+  // but that would imply background input would temporarily be treated differently for our controls
+  if (update && CanCalibrate())
     UpdateCalibration(state);
 
   state -= m_calibration;

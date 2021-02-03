@@ -20,19 +20,24 @@
 constexpr UINT WM_DOLPHIN_STOP = WM_USER;
 
 static Common::Event s_done_populating;
-static std::atomic<HWND> s_hwnd;
-static HWND s_message_window;
+static std::atomic<HWND> s_hwnd;  // Dolphin's render window
+static HWND s_message_window;  // Windows messaging window (hidden)
 static std::thread s_thread;
+static std::atomic<bool> s_first_pupulate_devices_asked;
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
   if (message == WM_INPUT_DEVICE_CHANGE)
   {
-    g_controller_interface.PlatformPopulateDevices([] {
-      ciface::DInput::PopulateDevices(s_hwnd);
-      ciface::XInput::PopulateDevices();
-    });
-    s_done_populating.Set();
+    // Windows automatically sends this message before we are "ready" to listen for it
+    if (s_first_pupulate_devices_asked)
+    {
+      g_controller_interface.PlatformPopulateDevices([] {
+        ciface::DInput::PopulateDevices(s_hwnd);
+        ciface::XInput::PopulateDevices();
+      });
+      s_done_populating.Set();
+    }
   }
 
   return DefWindowProc(hwnd, message, wparam, lparam);
@@ -53,7 +58,7 @@ void ciface::Win32::Init(void* hwnd)
 
     if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)))
     {
-      ERROR_LOG_FMT(SERIALINTERFACE, "CoInitializeEx failed: {}", GetLastError());
+      ERROR_LOG_FMT(CONTROLLERINTERFACE, "CoInitializeEx failed: {}", GetLastError());
       return;
     }
     Common::ScopeGuard uninit([] { CoUninitialize(); });
@@ -67,12 +72,12 @@ void ciface::Win32::Init(void* hwnd)
     ATOM window_class = RegisterClassEx(&window_class_info);
     if (!window_class)
     {
-      NOTICE_LOG_FMT(SERIALINTERFACE, "RegisterClassEx failed: {}", GetLastError());
+      NOTICE_LOG_FMT(CONTROLLERINTERFACE, "RegisterClassEx failed: {}", GetLastError());
       return;
     }
     Common::ScopeGuard unregister([&window_class] {
       if (!UnregisterClass(MAKEINTATOM(window_class), GetModuleHandle(nullptr)))
-        ERROR_LOG_FMT(SERIALINTERFACE, "UnregisterClass failed: {}", GetLastError());
+        ERROR_LOG_FMT(CONTROLLERINTERFACE, "UnregisterClass failed: {}", GetLastError());
     });
 
     message_window = CreateWindowEx(0, L"Message", nullptr, 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
@@ -80,12 +85,12 @@ void ciface::Win32::Init(void* hwnd)
     promise_guard.Exit();
     if (!message_window)
     {
-      ERROR_LOG_FMT(SERIALINTERFACE, "CreateWindowEx failed: {}", GetLastError());
+      ERROR_LOG_FMT(CONTROLLERINTERFACE, "CreateWindowEx failed: {}", GetLastError());
       return;
     }
     Common::ScopeGuard destroy([&] {
       if (!DestroyWindow(message_window))
-        ERROR_LOG_FMT(SERIALINTERFACE, "DestroyWindow failed: {}", GetLastError());
+        ERROR_LOG_FMT(CONTROLLERINTERFACE, "DestroyWindow failed: {}", GetLastError());
     });
 
     std::array<RAWINPUTDEVICE, 2> devices;
@@ -103,7 +108,7 @@ void ciface::Win32::Init(void* hwnd)
     if (!RegisterRawInputDevices(devices.data(), static_cast<UINT>(devices.size()),
                                  static_cast<UINT>(sizeof(decltype(devices)::value_type))))
     {
-      ERROR_LOG_FMT(SERIALINTERFACE, "RegisterRawInputDevices failed: {}", GetLastError());
+      ERROR_LOG_FMT(CONTROLLERINTERFACE, "RegisterRawInputDevices failed: {}", GetLastError());
       return;
     }
 
@@ -126,25 +131,30 @@ void ciface::Win32::PopulateDevices(void* hwnd)
   {
     s_hwnd = static_cast<HWND>(hwnd);
     s_done_populating.Reset();
+    s_first_pupulate_devices_asked = true;
+    // Do this forced devices refresh in the messaging thread so it won't cause any race conditions
     PostMessage(s_message_window, WM_INPUT_DEVICE_CHANGE, 0, 0);
     if (!s_done_populating.WaitFor(std::chrono::seconds(10)))
-      ERROR_LOG_FMT(SERIALINTERFACE, "win32 timed out when trying to populate devices");
+      ERROR_LOG_FMT(CONTROLLERINTERFACE, "win32 timed out when trying to populate devices");
   }
   else
   {
-    ERROR_LOG_FMT(SERIALINTERFACE,
+    ERROR_LOG_FMT(CONTROLLERINTERFACE,
                   "win32 asked to populate devices, but device thread isn't running");
   }
 }
 
 void ciface::Win32::DeInit()
 {
-  NOTICE_LOG_FMT(SERIALINTERFACE, "win32 DeInit");
+  NOTICE_LOG_FMT(CONTROLLERINTERFACE, "win32 DeInit");
   if (s_thread.joinable())
   {
     PostMessage(s_message_window, WM_DOLPHIN_STOP, 0, 0);
     s_thread.join();
     s_message_window = nullptr;
+    s_hwnd = nullptr;
+    s_done_populating.Reset();
+    s_first_pupulate_devices_asked = false;
   }
 
   XInput::DeInit();

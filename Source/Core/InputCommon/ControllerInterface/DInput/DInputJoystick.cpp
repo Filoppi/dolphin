@@ -60,7 +60,7 @@ void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
                                                   DISCL_BACKGROUND | DISCL_EXCLUSIVE)))
         {
           WARN_LOG_FMT(
-              PAD,
+              CONTROLLERINTERFACE,
               "DInput: Failed to acquire device exclusively. Force feedback will be unavailable.");
           // Fall back to non-exclusive mode, with no rumble
           if (FAILED(
@@ -187,7 +187,7 @@ Joystick::~Joystick()
   }
   else
   {
-    ERROR_LOG_FMT(PAD, "DInputJoystick: GetDeviceInfo failed.");
+    ERROR_LOG_FMT(CONTROLLERINTERFACE, "DInputJoystick: GetDeviceInfo failed.");
   }
 
   DeInitForceFeedback();

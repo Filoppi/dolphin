@@ -95,10 +95,10 @@ public:
   }
 
   std::string GetName() const override { return named_motors[m_index]; }
-  void SetState(ControlState state) override
+  void SetStateInternal(ControlState state) override
   {
     const auto old_value = m_motor;
-    m_motor = (WORD)(state * m_range);
+    m_motor = WORD(std::clamp(state, 0.0, 1.0) * m_range);
 
     // Only update if the state changed.
     if (m_motor != old_value)
@@ -119,6 +119,11 @@ public:
   std::string GetName() const override { return "Battery"; }
   ControlState GetState() const override { return m_level; }
   bool IsDetectable() const override { return false; }
+  // We don't need focus to pass the battery level
+  virtual Core::Device::FocusFlags GetFocusFlags() const
+  {
+    return Core::Device::FocusFlags::IgnoreFocus;
+  }
 
 private:
   const ControlState& m_level;

@@ -19,15 +19,52 @@
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
 class ControllerInterface;
+class ControlReference;
 
 const char* const named_directions[] = {_trans("Up"), _trans("Down"), _trans("Left"),
                                         _trans("Right")};
 
-class ControlReference;
-
 namespace ControllerEmu
 {
 class ControlGroup;
+
+// This is generic and could be moved outside
+struct RecursiveMutexCountedLockGuard
+{
+  RecursiveMutexCountedLockGuard(std::recursive_mutex* mutex, std::atomic<int>* count)
+      : m_mutex(mutex), m_count(count)
+  {
+    m_mutex->lock();
+    if (m_count)
+      m_count->fetch_add(1);
+  }
+  ~RecursiveMutexCountedLockGuard()
+  {
+    if (m_count)
+      m_count->fetch_sub(1);
+    if (m_mutex)
+      m_mutex->unlock();
+  }
+  RecursiveMutexCountedLockGuard(const RecursiveMutexCountedLockGuard& other)
+      : m_mutex(other.m_mutex), m_count(other.m_count)
+  {
+    m_mutex->lock();
+    if (m_count)
+      m_count->fetch_add(1);
+  }
+  RecursiveMutexCountedLockGuard& operator=(const RecursiveMutexCountedLockGuard& other) = delete;
+  RecursiveMutexCountedLockGuard(RecursiveMutexCountedLockGuard&& other) noexcept
+      : m_mutex(other.m_mutex), m_count(other.m_count)
+  {
+    other.m_mutex = nullptr;
+    other.m_count = nullptr;
+  }
+  RecursiveMutexCountedLockGuard&
+  operator=(RecursiveMutexCountedLockGuard&& other) noexcept = delete;
+
+  std::recursive_mutex* m_mutex;
+  std::atomic<int>* m_count;
+};
 
 // Represents calibration data found on Wii Remotes + extensions with a zero and a max value.
 // (e.g. accelerometer data)
@@ -179,6 +216,7 @@ public:
   virtual void SaveConfig(IniFile::Section* sec, const std::string& base = "");
 
   bool IsDefaultDeviceConnected() const;
+  bool HasDefaultDevice() const;
   const ciface::Core::DeviceQualifier& GetDefaultDevice() const;
   void SetDefaultDevice(const std::string& device);
   void SetDefaultDevice(ciface::Core::DeviceQualifier devq);
@@ -186,11 +224,24 @@ public:
   void UpdateReferences(const ControllerInterface& devi);
   void UpdateSingleControlReference(const ControllerInterface& devi, ControlReference* ref);
 
-  // This returns a lock that should be held before calling State() on any control
-  // references and GetState(), by extension. This prevents a race condition
-  // which happens while handling a hotplug event because a control reference's State()
-  // could be called before we have finished updating the reference.
-  [[nodiscard]] static std::unique_lock<std::recursive_mutex> GetStateLock();
+  // Caches all the input once for later retrieval.
+  void CacheInput();
+
+  // This should be called before calling most methods of a ControlReference (thus also
+  // NumericSetting<T> and SettingValue<T>), except GetState()/GetValue(), to prevent cuncurrent
+  // R/W. This is a recursive mutex because UpdateReferences is recursive, and because some code
+  // might just call it more than once. This often assumes the host/UI thread is the only one that
+  // writes on ControlReferences (and so it is, except for UpdateReferences(), which is safe).
+  // This mutex doesn't necessarily keep ControlReference(s) state consistent within
+  // an emulation frame, (e.g. the attached devices can change at any time, or you
+  // could be editing the expression), but reading from them is always safe.
+  [[nodiscard]] static RecursiveMutexCountedLockGuard GetStateLock();
+  // Prints an error in Debug only
+  static void EnsureStateLock();
+  //To review: usage on OutputReference::SetState()? As it could end up reading inputs as well
+  // This needs to be called when updating devices inputs as they might otherwise be read by
+  // ControlReferences expressions GetState() while being written.
+  [[nodiscard]] static std::unique_lock<std::recursive_mutex> GetDevicesInputLock();
 
   std::vector<std::unique_ptr<ControlGroup>> groups;
 

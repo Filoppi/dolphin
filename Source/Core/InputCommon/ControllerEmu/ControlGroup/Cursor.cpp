@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <ratio>
 #include <memory>
 #include <string>
 
@@ -21,10 +22,11 @@
 
 namespace ControllerEmu
 {
+using milli_with_remainder = std::chrono::duration<double, std::milli>;
+
 Cursor::Cursor(std::string name_, std::string ui_name_)
-    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor), m_last_update{
-                                                                                   Clock::now(),
-                                                                                   Clock::now()}
+    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor),
+      m_last_update(Clock::now())
 {
   for (auto& named_direction : named_directions)
     AddInput(Translate, named_direction);
@@ -66,7 +68,7 @@ Cursor::Cursor(std::string name_, std::string ui_name_)
       static_cast<NumericSetting<bool>*>(numeric_settings.back().get());
   AddSetting(&m_relative_absolute_time_setting,
              {_trans("Relative Input Absolute Time"), _trans(""),
-              _trans("Enable if you are using an absolute input device (e.g. mouse, touch "
+              _trans("Enable if you are using a relative input device (e.g. mouse axis, touch "
                      "surface),\nit will make it independent from the emulation speed.")},
              false, false, true, edit_condition);
   AddSetting(&m_autohide_setting, {_trans("Auto-Hide")}, false);
@@ -91,18 +93,20 @@ ControlState Cursor::GetGateRadiusAtAngle(double ang) const
   return SquareStickGate(1.0).GetRadiusAtAngle(ang);
 }
 
-Cursor::StateData Cursor::GetState(float absolute_time_elapsed, bool is_ui)
+//To revert to two states?
+// TODO: pass in the state as reference and let wiimote and UI keep their own state.
+Cursor::StateData Cursor::GetState(bool update, float absolute_time_elapsed)
 {
+  if (!update)
+    return m_final_state;
+
   const auto input = GetReshapableState(true);
 
-  int i = is_ui ? 1 : 0;
-
-  // Kill this after state is moved into wiimote rather than this class.
   const auto now = Clock::now();
+
   const auto ms_since_update =
-      std::chrono::duration_cast<std::chrono::microseconds>(now - m_last_update[i]).count() /
-      1000.0;
-  m_last_update[i] = now;
+      std::chrono::duration_cast<milli_with_remainder>(now - m_last_update).count();
+  m_last_update = now;
 
   // Relative input (the second check is for Hold):
   if (m_relative_setting.GetValue() ^ controls[6]->GetState<bool>())
@@ -110,77 +114,78 @@ Cursor::StateData Cursor::GetState(float absolute_time_elapsed, bool is_ui)
     // Recenter:
     if (controls[5]->GetState<bool>())
     {
-      m_state[i].x = 0.0;
-      m_state[i].y = 0.0;
+      m_state.x = 0.0;
+      m_state.y = 0.0;
     }
     else
     {
       // If we are using a mouse axis to drive the cursor (there are reasons to), we want the
-      // step to be independent from the game speed, otherwise it would move at a different speed
-      // depending on the game speed.
+      // step to be independent from the emu speed, otherwise it would move at a different speed
+      // depending on it.
       // In other words, we want to be indipendent from time, and just use it as an absolute cursor.
-      // Of course if the emulation can't keep up with the wii mote
-      // emulation rate, the absolute time won't be accurate.
-      bool use_absolute_time = m_relative_absolute_time_setting.GetValue() && !is_ui;
+      // Of course if the emulation can't keep up with full speed, absolute time won't be accurate.
+      // Also the chrono timer as of now is extremely unstable between frames,
+      // so it add quite a lot of imprecision.
+      bool use_absolute_time =
+          m_relative_absolute_time_setting.GetValue() && absolute_time_elapsed >= 0.f;
       const double step =
           STEP_PER_SEC * (use_absolute_time ? absolute_time_elapsed : (ms_since_update / 1000.0));
 
-      m_state[i].x += input.x * step;
-      m_state[i].y += input.y * step;
+      m_state.x += input.x * step;
+      m_state.y += input.y * step;
     }
   }
   // Absolute input:
   else
   {
-    m_state[i].x = input.x;
-    m_state[i].y = input.y;
+    m_state.x = input.x;
+    m_state.y = input.y;
   }
 
   // Clamp between -1 and 1, before auto hide. Clamping after auto hide could make it easier to find
   // when you've lost the cursor but it could also make it more annoying.
   // If we don't do this, we could go over the user specified angles (which can just be increased
   // instead), or lose the cursor over the borders.
-  m_state[i].x = std::clamp(m_state[i].x, -1.0, 1.0);
-  m_state[i].y = std::clamp(m_state[i].y, -1.0, 1.0);
+  m_state.x = std::clamp(m_state.x, -1.0, 1.0);
+  m_state.y = std::clamp(m_state.y, -1.0, 1.0);
 
-  StateData result = m_state[i];
+  m_final_state = m_state;
 
   const bool autohide = m_autohide_setting.GetValue();
 
   // Auto-hide timer (ignores Z):
-  if (!autohide || std::abs(m_prev_result[i].x - result.x) > AUTO_HIDE_DEADZONE ||
-      std::abs(m_prev_result[i].y - result.y) > AUTO_HIDE_DEADZONE)
+  if (!autohide || std::abs(m_prev_state.x - m_final_state.x) > AUTO_HIDE_DEADZONE ||
+      std::abs(m_prev_state.y - m_final_state.y) > AUTO_HIDE_DEADZONE)
   {
-    m_auto_hide_timer[i] = AUTO_HIDE_MS;
+    m_auto_hide_timer = AUTO_HIDE_MS;
   }
-  else if (m_auto_hide_timer[i])
+  else if (m_auto_hide_timer)
   {
     // Auto hide is based on real world time, doesn't depend on emulation time/speed
-    m_auto_hide_timer[i] -= std::min<int>(ms_since_update, m_auto_hide_timer[i]);
+    m_auto_hide_timer -= std::min<int>(ms_since_update, m_auto_hide_timer);
   }
 
-  m_prev_result[i] = result;
+  m_prev_state = m_final_state;
 
   // If auto-hide time is up or hide button is held:
-  if (!m_auto_hide_timer[i] || controls[4]->GetState<bool>())
+  if (!m_auto_hide_timer || controls[4]->GetState<bool>())
   {
-    result.x = std::numeric_limits<ControlState>::quiet_NaN();
-    result.y = 0;
+    m_final_state.x = std::numeric_limits<ControlState>::quiet_NaN();
+    m_final_state.y = 0;
   }
 
-  return result;
+  return m_final_state;
 }
 
-void Cursor::ResetState(bool is_ui)
+void Cursor::ResetState()
 {
-  int i = is_ui ? 1 : 0;
+  m_state = {};
+  m_prev_state = {};
+  m_final_state = {};
 
-  m_state[i] = {};
-  m_prev_result[i] = {};
+  m_auto_hide_timer = AUTO_HIDE_MS;
 
-  m_auto_hide_timer[i] = AUTO_HIDE_MS;
-
-  m_last_update[i] = Clock::now();
+  m_last_update = Clock::now();
 }
 
 ControlState Cursor::GetTotalYaw() const

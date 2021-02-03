@@ -12,9 +12,10 @@
 
 #include "Common/Matrix.h"
 #include "Common/WindowSystemInfo.h"
+#include "InputCommon/ControllerInterface/InputChannel.h"
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
-// enable disable sources
+// enable/disable sources
 #ifdef _WIN32
 #define CIFACE_USE_WIN32
 #endif
@@ -52,7 +53,8 @@ public:
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
   void PlatformPopulateDevices(std::function<void()> callback);
   bool IsInit() const { return m_is_init; }
-  void UpdateInput();
+  void UpdateInput(ciface::InputChannel input_channel, double delta_seconds);
+  void Reset(ciface::InputChannel input_channel);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
   // Used to fit mouse cursor inputs to the relevant region of the render window.
@@ -66,13 +68,16 @@ public:
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
 
+  static ciface::InputChannel GetCurrentInputChannel();
+  static double GetCurrentInputDeltaSeconds();
+
 private:
   std::list<std::function<void()>> m_devices_changed_callbacks;
   mutable std::mutex m_callbacks_mutex;
   std::atomic<bool> m_is_init;
-  std::atomic<bool> m_is_populating_devices{false};
+  std::atomic<int> m_is_populating_devices;
   WindowSystemInfo m_wsi;
-  std::atomic<float> m_aspect_ratio_adjustment = 1;
+  std::atomic<float> m_aspect_ratio_adjustment = 1.f;
 };
 
 extern ControllerInterface g_controller_interface;

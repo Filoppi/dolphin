@@ -245,9 +245,9 @@ bool TryParse(const std::string& str, bool* const output)
 {
   float value;
   const bool is_valid_float = TryParse(str, &value);
-  if ((is_valid_float && value == 1) || !strcasecmp("true", str.c_str()))
+  if ((is_valid_float && value == 1.f) || !strcasecmp("true", str.c_str()))
     *output = true;
-  else if ((is_valid_float && value == 0) || !strcasecmp("false", str.c_str()))
+  else if ((is_valid_float && value == 0.f) || !strcasecmp("false", str.c_str()))
     *output = false;
   else
     return false;

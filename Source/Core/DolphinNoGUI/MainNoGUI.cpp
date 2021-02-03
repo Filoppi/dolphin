@@ -90,6 +90,12 @@ bool Host_RendererHasFocus()
   return s_platform->IsWindowFocused();
 }
 
+bool Host_RendererHasFullFocus()
+{
+  // Mouse capturing isn't implemented
+  return Host_RendererHasFocus();
+}
+
 bool Host_RendererIsFullscreen()
 {
   return s_platform->IsWindowFullscreen();

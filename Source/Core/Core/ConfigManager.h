@@ -149,6 +149,7 @@ struct SConfig
   // Interface settings
   bool bConfirmStop = false;
   bool bHideCursor = false;
+  bool bLockCursor = true;
   std::string theme_name;
 
   // Bluetooth passthrough mode settings

@@ -107,16 +107,19 @@ void Guitar::Update()
   }
 
   // slider bar
-  if (m_slider_bar->controls[0]->control_ref->BoundCount())
   {
-    const ControllerEmu::Slider::StateData slider_data = m_slider_bar->GetState();
+    if (m_slider_bar->controls[0]->control_ref->BoundCount() &&
+        m_slider_bar->controls[1]->control_ref->BoundCount())
+    {
+      const ControllerEmu::Slider::StateData slider_data = m_slider_bar->GetState();
 
-    guitar_data.sb = s_slider_bar_control_codes.lower_bound(slider_data.value)->second;
-  }
-  else
-  {
-    // if user has not mapped controls for slider bar, tell game it's untouched
-    guitar_data.sb = 0x0F;
+      guitar_data.sb = s_slider_bar_control_codes.lower_bound(slider_data.value)->second;
+    }
+    else
+    {
+      // if user doesn't have an input expression for slider bar, tell game it's untouched
+      guitar_data.sb = 0x0F;
+    }
   }
 
   // whammy bar

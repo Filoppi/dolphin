@@ -16,6 +16,9 @@
 #include <QPainterPath>
 #include <QTimer>
 
+#include "Core/Core.h"
+#include "Core/HW/Wiimote.h"
+
 #include "Common/MathUtil.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
@@ -27,6 +30,7 @@
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
 #include "DolphinQt/Config/Mapping/MappingWidget.h"
+#include "DolphinQt/Config/Mapping/MappingWindow.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
 
 namespace
@@ -128,6 +132,17 @@ void MappingIndicator::AdjustGateColor(QColor* color)
   if (GetBBoxBrush().color().valueF() < 0.5)
     color->setHsvF(color->hueF(), color->saturationF(), 1 - color->valueF());
 }
+
+// Note that if this is higher from the input devices update frequency,
+// the same input value might be processed more than once (not a problem really).
+// Paint events can be triggered for other reasons as well but this is mostly accurate.
+int MappingIndicator::GetUpdateFrequency() const
+{
+  if (m_mapping_window)
+    return m_mapping_window->GetIndicatorUpdateFrequency();
+  return 60;
+}
+
 
 SquareIndicator::SquareIndicator()
 {
@@ -285,15 +300,18 @@ void GenerateFibonacciSphere(int point_count, F&& callback)
 
 }  // namespace
 
-void MappingIndicator::paintEvent(QPaintEvent*)
+void MappingIndicator::paintEvent(QPaintEvent* asd)
 {
-  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
   Draw();
 }
 
 void CursorIndicator::Draw()
 {
-  const auto adj_coord = m_cursor_group.GetState(0.f, true);
+  // Theoretically this should be updated at the same rate input devices are updated if using
+  // the relative setting, otherwise some relative movements would be lost and some read twice, but
+  // it's not a big deal, being UI only.
+  // Only update the cursor state if emulation is not running, otherwise get the last state.
+  const auto adj_coord = m_cursor_group.GetState(Core::GetState() == Core::State::Uninitialized);
 
   DrawReshapableInput(m_cursor_group, CURSOR_TV_COLOR,
                       adj_coord.IsVisible() ?
@@ -413,7 +431,7 @@ void AnalogStickIndicator::Draw()
 
 void TiltIndicator::Draw()
 {
-  WiimoteEmu::EmulateTilt(&m_motion_state, &m_group, 1.f / INDICATOR_UPDATE_FREQ);
+  WiimoteEmu::EmulateTilt(&m_motion_state, &m_group, 1.f / GetUpdateFrequency());
 
   auto adj_coord = Common::DVec2{-m_motion_state.angle.y, m_motion_state.angle.x} / MathUtil::PI;
 
@@ -467,8 +485,13 @@ void MixedTriggersIndicator::Draw()
     const double raw_analog = raw_analog_state[t];
     const double adj_analog = adj_analog_state[t];
     const bool trigger_button = button_state & button_masks[t];
-    auto const analog_name = QString::fromStdString(triggers.controls[TRIGGER_COUNT + t]->ui_name);
-    auto const button_name = QString::fromStdString(triggers.controls[t]->ui_name);
+    int t2 = t + TRIGGER_COUNT;
+    bool translate = triggers.controls[t2]->translate == ControllerEmu::Translate;
+    auto const analog_name = translate ? tr(triggers.controls[t2]->ui_name.c_str()) :
+                                         QString::fromStdString(triggers.controls[t2]->ui_name);
+    translate = triggers.controls[t]->translate == ControllerEmu::Translate;
+    auto const button_name = translate ? tr(triggers.controls[t]->ui_name.c_str()) :
+                                         QString::fromStdString(triggers.controls[t]->ui_name);
 
     const QRectF trigger_rect(0.5, 0.5, trigger_width, trigger_height);
 
@@ -565,7 +588,7 @@ void SwingIndicator::DrawUnderGate(QPainter& p)
 void SwingIndicator::Draw()
 {
   auto& force = m_swing_group;
-  WiimoteEmu::EmulateSwing(&m_motion_state, &force, 1.f / INDICATOR_UPDATE_FREQ);
+  WiimoteEmu::EmulateSwing(&m_motion_state, &force, 1.f / GetUpdateFrequency());
 
   DrawReshapableInput(force, SWING_GATE_COLOR,
                       Common::DVec2{-m_motion_state.position.x, m_motion_state.position.z});
@@ -573,15 +596,22 @@ void SwingIndicator::Draw()
 
 void ShakeMappingIndicator::Draw()
 {
-  constexpr std::size_t HISTORY_COUNT = INDICATOR_UPDATE_FREQ;
+  // Keep one second of history
+  const std::size_t history_count = GetUpdateFrequency();
 
-  WiimoteEmu::EmulateShake(&m_motion_state, &m_shake_group, 1.f / INDICATOR_UPDATE_FREQ);
+  WiimoteEmu::EmulateShake(&m_motion_state, &m_shake_group, 1.f / GetUpdateFrequency());
 
   constexpr float MAX_DISTANCE = 0.5f;
 
+  // Prefill them so it's not distracting when drawing for the first time
+  if (m_position_samples.size() == 0)
+  {
+    while (m_position_samples.size() <= history_count)
+      m_position_samples.push_front(Common::Vec3(0.f, 0.f, 0.f));
+  }
   m_position_samples.push_front(m_motion_state.position / MAX_DISTANCE);
   // This also holds the current state so +1.
-  if (m_position_samples.size() > HISTORY_COUNT + 1)
+  while (m_position_samples.size() > history_count + 1)
     m_position_samples.pop_back();
 
   QPainter p(this);
@@ -614,9 +644,9 @@ void ShakeMappingIndicator::Draw()
                   [](const Common::Vec3& v) { return v.LengthSquared() != 0.0; }))
   {
     // Only start moving the line if there's non-zero data.
-    m_grid_line_position = (m_grid_line_position + 1) % HISTORY_COUNT;
+    m_grid_line_position = (m_grid_line_position + 1) % history_count;
   }
-  const double grid_line_x = 1.0 - m_grid_line_position * 2.0 / HISTORY_COUNT;
+  const double grid_line_x = 1.0 - m_grid_line_position * 2.0 / history_count;
   p.setPen(QPen(GetRawInputColor(), 0));
   p.drawLine(QPointF{grid_line_x, -1.0}, QPointF{grid_line_x, 1.0});
 
@@ -630,7 +660,7 @@ void ShakeMappingIndicator::Draw()
     int i = 0;
     for (auto& sample : m_position_samples)
     {
-      polyline.append(QPointF{1.0 - i * 2.0 / HISTORY_COUNT, sample.data[c]});
+      polyline.append(QPointF{1.0 - i * 2.0 / history_count, sample.data[c]});
       ++i;
     }
 
@@ -717,27 +747,28 @@ void AccelerometerMappingIndicator::Draw()
 
 void GyroMappingIndicator::Draw()
 {
-  const auto gyro_state = m_gyro_group.GetState();
+  // Only update the gyro state if emulation is not running, otherwise get the last state.
+  const auto gyro_state = m_gyro_group.GetState(Core::GetState() == Core::State::Uninitialized);
   const auto raw_gyro_state = m_gyro_group.GetRawState();
   const auto angular_velocity = gyro_state.value_or(Common::Vec3{});
   const auto jitter = raw_gyro_state - m_previous_velocity;
   m_previous_velocity = raw_gyro_state;
 
   m_state *= WiimoteEmu::GetRotationFromGyroscope(angular_velocity * Common::Vec3(-1, +1, -1) /
-                                                  INDICATOR_UPDATE_FREQ);
+                                                  GetUpdateFrequency());
   m_state = m_state.Normalized();
 
-  // Reset orientation when stable for a bit:
-  constexpr u32 STABLE_RESET_STEPS = INDICATOR_UPDATE_FREQ;
+  // Reset orientation when stable for one second:
+  const u32 stable_reset_steps = GetUpdateFrequency();
   // Consider device stable when data (with deadzone applied) is zero.
   const bool is_stable = !angular_velocity.LengthSquared();
 
   if (!is_stable)
     m_stable_steps = 0;
-  else if (m_stable_steps != STABLE_RESET_STEPS)
+  else if (m_stable_steps < stable_reset_steps)
     ++m_stable_steps;
 
-  if (STABLE_RESET_STEPS == m_stable_steps)
+  if (m_stable_steps >= stable_reset_steps)
     m_state = Common::Quaternion::Identity();
 
   // Use an empty rotation matrix if gyroscope data is not present.
@@ -895,6 +926,7 @@ CalibrationWidget::CalibrationWidget(ControllerEmu::ReshapableInput& input,
 
 void CalibrationWidget::SetupActions()
 {
+  //To review: this button turns red too late, also the grey dot behind the red is sometimes offsetted
   const auto calibrate_action = new QAction(tr("Calibrate"), this);
   const auto center_action = new QAction(tr("Center and Calibrate"), this);
   const auto reset_action = new QAction(tr("Reset"), this);

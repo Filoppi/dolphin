@@ -3,15 +3,19 @@
 // Refer to the license.txt file included.
 
 #include "InputCommon/ControlReference/FunctionExpression.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
+#include "Common/Common.h"
 #include "Common/MathUtil.h"
 #include "Core/Core.h"
 #include "Core/Host.h"
+#include "Core/HW/VideoInterface.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 
+#pragma optimize("", off) //To delete both
 namespace ciface::ExpressionParser
 {
 using Clock = std::chrono::steady_clock;
@@ -270,48 +274,6 @@ private:
   }
 };
 
-// usage: timer(seconds)
-class TimerExpression : public FunctionExpression
-{
-private:
-  ArgumentValidation
-  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
-  {
-    if (args.size() == 1)
-      return ArgumentsAreValid{};
-    else
-      return ExpectedArguments{"seconds"};
-  }
-
-  ControlState GetValue() const override
-  {
-    const auto now = Clock::now();
-    const auto elapsed = now - m_start_time;
-
-    const ControlState val = GetArg(0).GetValue();
-
-    ControlState progress = std::chrono::duration_cast<FSec>(elapsed).count() / val;
-
-    if (std::isinf(progress) || progress < 0.0)
-    {
-      // User configured a non-positive timer. Reset the timer and return 0.
-      progress = 0.0;
-      m_start_time = now;
-    }
-    else if (progress >= 1.0)
-    {
-      const ControlState reset_count = std::floor(progress);
-
-      m_start_time += std::chrono::duration_cast<Clock::duration>(FSec(val * reset_count));
-      progress -= reset_count;
-    }
-
-    return progress;
-  }
-
-  mutable Clock::time_point m_start_time = Clock::now();
-};
-
 // usage: if(condition, true_expression, false_expression)
 class IfExpression : public FunctionExpression
 {
@@ -327,9 +289,258 @@ private:
 
   ControlState GetValue() const override
   {
-    return (GetArg(0).GetValue() > CONDITION_THRESHOLD) ? GetArg(1).GetValue() :
-                                                          GetArg(2).GetValue();
+    const ControlState true_state = GetArg(1).GetValue();
+    const ControlState false_state = GetArg(2).GetValue();
+    return (GetArg(0).GetValue() > CONDITION_THRESHOLD) ? true_state : false_state;
   }
+};
+
+//To finish IntervalExpression, RecordExpression, SequenceExpression, LagExpression, Average, Sum
+//To test all functions and check all ControllerInterface::GetCurrentInputDeltaSeconds(). smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
+
+// usage: interval(delay_frames, duration_frames)
+class IntervalExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"delay_frames, duration_frames"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns 1 for \"duration_frames\" every \"delay_frames\"");
+  }
+
+  ControlState GetValue() const override
+  {
+    const u32 delay_frames = u32(GetArg(0).GetValue() + 0.5);
+    const u32 duration_frames = u32(GetArg(1).GetValue() + 0.5);
+    if (delay_frames >= delay_frame_counter)
+    {
+      delay_frame_counter = 0;
+      duration_frame_counter++;
+    }
+    if (duration_frames < duration_frame_counter)
+    {
+      m_cached_values.push_back(1.0);
+    }
+    else
+    {
+      delay_frame_counter++;
+    }
+    return m_cached_values.back();
+  }
+
+  mutable std::vector<ControlState> m_cached_values;
+  mutable u32 delay_frame_counter;
+  mutable u32 duration_frame_counter;
+};
+
+// usage: sequence(input, value_0, value_1, ...)
+class SequenceExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() >= 3)  // Enforce at least two values, use onPress() otherwise
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input, value_0, value_1, ..."};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Will start playing back the specified sequence (frame by frame)\nevery time the "
+                  "input is pressed");
+  }
+
+  ControlState GetValue() const override
+  {
+    const ControlState input = GetArg(0).GetValue();
+    // We need to retrieve all the states for consistency, though for this
+    // we should "enforce" literal expressions which don't have a state
+    std::vector<ControlState> sequence;
+    u32 sequence_length = GetArgCount() - 1;
+    sequence.reserve(sequence_length);
+    for (u32 i = 1; i < GetArgCount(); ++i)
+      sequence.push_back(GetArg(i).GetValue());
+
+    if (input > CONDITION_THRESHOLD && !m_pressed)
+    {
+      m_started = true;
+      m_index = 0;
+    }
+    m_pressed = input > CONDITION_THRESHOLD;
+
+    if (!m_started)
+      return 0;
+
+    if (m_index >= sequence_length)
+    {
+      m_started = false;
+      return 0;
+    }
+
+    // Increase the index
+    return sequence[m_index++];
+  }
+
+  mutable u32 m_index = 0;
+  mutable bool m_pressed = false;
+  mutable bool m_started = false;
+};
+
+// usage: record(input, playback_input)
+class RecordExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input, playback_input"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("It will record (and output) when \"input\" is held down, and playback when "
+                  "\"playback_input\" is pressed");
+  }
+
+  ControlState GetValue() const override { return 0; }
+
+  mutable std::vector<ControlState> m_cached_values;
+};
+
+// usage: lag(input, lag_frames)
+class LagExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input, lag_frames"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Will lag the input by \"lag_frames\"");
+  }
+
+  ControlState GetValue() const override { return 0; }
+
+  mutable std::vector<ControlState> m_cached_values;
+};
+
+// usage: average(input, frames)
+class AverageExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input, frames"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns the average of the input over the specified number of frames");
+  }
+
+  ControlState GetValue() const override { return 0; }
+
+  mutable std::vector<ControlState> m_cached_values;
+};
+
+// usage: sum(input, frames)
+// E.g. GC SerialInterface updates at twice the video refresh rate of the game, it's very unlikely
+// that games will consider/read both inputs so we sum the last two to not miss values
+class SumExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input, frames"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns the sum of the input over the specified number of frames.\nUse "
+                  "this on relative inputs to avoid losing values not read by the game");
+  }
+
+  ControlState GetValue() const override { return 0; }
+
+  mutable std::vector<ControlState> m_cached_values;
+};
+
+// usage: timer(seconds)
+class TimerExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"seconds"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns the progress to reach the specified time. Loops around once reached");
+  }
+
+  ControlState GetValue() const override
+  {
+    const ControlState seconds = GetArg(0).GetValue();
+
+    if (seconds <= 0.0)
+    {
+      // User configured a non-positive timer. Reset the timer and return 0.
+      m_progress = 0.0;
+      m_has_started = false;
+      return m_progress;
+    }
+
+    // The very first frame needs to return 0
+    if (m_has_started)
+      m_progress += ControllerInterface::GetCurrentInputDeltaSeconds() / seconds;
+
+    if (m_progress > 1.0)
+    {
+      const double reset_count = std::floor(m_progress);
+      m_progress -= reset_count;
+    }
+    else if (m_progress <= 0.0)
+    {
+      m_has_started = true;
+    }
+
+    return m_progress;
+  }
+
+  mutable bool m_has_started = false;
+  mutable double m_progress = 0.0;
 };
 
 // usage: deadzone(input, amount)
@@ -354,8 +565,6 @@ private:
 };
 
 // usage: antiDeadzone(input, amount)
-// Goes against a game built in deadzone, like if it will treat 0.2 (amount) as 0,
-// but will treat 0.3 as 0.125. It should be applied after deadzone
 class AntiDeadzoneExpression : public FunctionExpression
 {
 private:
@@ -368,26 +577,27 @@ private:
       return ExpectedArguments{"input, amount"};
   }
 
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Goes against a game built in deadzone, like if it will treat 0.2 (amount) as "
+                  "0,\nbut will treat 0.3 as 0.125. It should be applied after deadzone");
+  }
+
   ControlState GetValue() const override
   {
     const ControlState val = GetArg(0).GetValue();
     const ControlState anti_deadzone = GetArg(1).GetValue();
-    // Fixes the problem where 2 opposite axis have the same anti deadzone
-    // so they would cancel each other out if we didn't check for this
+    // We don't want to return a min of anti_deadzone if our val is 0.
+    // It fixes the problem where 2 opposite axes (e.g. R stick X+ and R stick Y-) have the same
+    // anti deadzone expression so they would cancel each other out if we didn't check for this.
     if (val == 0.0)
-    {
-      return 0.0;
-    }
+      return 0;
     const ControlState abs_val = std::abs(val);
     return std::copysign(anti_deadzone + abs_val * (1.0 - anti_deadzone), val);
   }
 };
 
 // usage: bezierCurve(input, x1, x2)
-// 2 control points bezier. Basically just a fancy "remap" in one dimension.
-// Useful to go against games analog stick response curve when using the mouse as
-// as axis, or when games have a linear response curve to an analog stick and
-// you'd like to change it. Mostly used on the x axis (left/right).
 class BezierCurveExpression : public FunctionExpression
 {
 private:
@@ -398,6 +608,15 @@ private:
       return ArgumentsAreValid{};
     else
       return ExpectedArguments{"input, x1, x2"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans(
+        "2 control points bezier.\nBasically just a fancy \"remap\"in one dimension.\n"
+        "Useful to go against games analog stick response curve\nwhen using the"
+        "mouse as as axis, or when games have\na linear response curve to an analog stick"
+        "\nand you'd like to change it.\nMostly used on the x axis (left/right)");
   }
 
   ControlState GetValue() const override
@@ -420,18 +639,13 @@ private:
   }
 };
 
-// usage: acceleration(input, max_acceleration_time, acceleration, min_time_input,
-// min_acceleration_input, max_acceleration_input = 1)
-// Useful when using the mouse as an axis and you don't want the game
-// to gradually accelerate its response with time. It should help in
-// keeping a response curve closer to 1:1 (linear).
-// The way this work is by "predicting" the acceleration the game would have with time,
-// and increasing the input value so you won't feel any acceleration,
-// the drawback is that you might see some velocity snapping, and this doesn't
-// work when passing in a maxed out input of course.
-// An alternative approach would be to actually try to shrink the input as time passed,
-// to counteract the acceleration, but that would strongly limit the max output.
-// Use after AntiDeadzone and BezierCurve. In some games acceleration is only on the X axis.
+// usage: acceleration(input, max_acc_time, acc, min_time_input, min_acc_input, max_acc_input = 1)
+// The way this work is by "predicting" the acceleration the game would have with time, and
+// increasing the input value so you won't feel any acceleration, the drawback is that you might see
+// some velocity snapping, and this doesn't work when passing in a maxed out input of course. An
+// alternative approach would be to actually try to shrink the input as time passed, to counteract
+// the acceleration, but that would strongly limit the max output. Use after AntiDeadzone and
+// BezierCurve. In some games acceleration is only on the X axis.
 class AntiAccelerationExpression : public FunctionExpression
 {
 private:
@@ -441,14 +655,20 @@ private:
     if (args.size() == 5 || args.size() == 6)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, max_acceleration_time, acceleration, min_time_input, "
-                               "min_acceleration_input, max_acceleration_input = 1"};
+      return ExpectedArguments{"input, max_acc_time, acc, min_time_input, "
+                               "min_acc_input, max_acc_input = 1"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans(
+        "Useful when using the mouse as an axis and you don't want\nthe game to gradually "
+        "accelerate its response with time.\nIt should help in keeping a response curve closer to "
+        "1:1 (linear)");
   }
 
   ControlState GetValue() const override
   {
-    // Always get all the values as other expressions might change values in their GetValue() method
-
     const ControlState val = GetArg(0).GetValue();
     // After this time, the game won't accelerate anymore
     const ControlState max_acc_time = 1.0 + GetArg(1).GetValue();
@@ -466,7 +686,6 @@ private:
     if (abs_val < min_acc_input)
     {
       m_elapsed = 0.0;
-      m_last_update = Clock::now();
       return val;
     }
 
@@ -477,27 +696,18 @@ private:
 
     const ControlState multiplier = MathUtil::Lerp(1.0, acc * acc_alpha, time_alpha * time_alpha);
 
-    const auto now = Clock::now();
     if (abs_val >= min_time_input)
-    {
-      // This should be multiplied by the actual emulation speed of course but it can't here
-      m_elapsed += std::chrono::duration_cast<FSec>(now - m_last_update).count();
-    }
+      m_elapsed += ControllerInterface::GetCurrentInputDeltaSeconds();
     else
-    {
       m_elapsed = 0.0;
-    }
-    m_last_update = now;
 
     return std::copysign(abs_val * multiplier, val);
   }
 
-  mutable Clock::time_point m_last_update = Clock::now();
-  mutable ControlState m_elapsed = 0.0;
+  mutable double m_elapsed = 0.0;
 };
 
 // usage: smooth(input, seconds_up, seconds_down = seconds_up)
-// seconds is seconds to change from 0.0 to 1.0
 class SmoothExpression : public FunctionExpression
 {
 private:
@@ -510,39 +720,39 @@ private:
       return ExpectedArguments{"input, seconds_up, seconds_down = seconds_up"};
   }
 
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Gradually moves its internal value toward its target value (input).\nIt asks to "
+                  "specify the times to go between 0 and 1");
+  }
+
   ControlState GetValue() const override
   {
-    const auto now = Clock::now();
-    const auto elapsed = now - m_last_update;
-    m_last_update = now;
-
     const ControlState desired_value = GetArg(0).GetValue();
 
     const ControlState smooth_up = GetArg(1).GetValue();
     const ControlState smooth_down = GetArgCount() == 3 ? GetArg(2).GetValue() : smooth_up;
 
-    const ControlState smooth = (desired_value < m_value) ? smooth_down : smooth_up;
-    const ControlState max_move = std::chrono::duration_cast<FSec>(elapsed).count() / smooth;
+    const ControlState smooth = (desired_value < m_state) ? smooth_down : smooth_up;
+    const ControlState max_move = ControllerInterface::GetCurrentInputDeltaSeconds() / smooth;
 
     if (std::isinf(max_move))
     {
-      m_value = desired_value;
+      m_state = desired_value;
     }
     else
     {
-      const ControlState diff = desired_value - m_value;
-      m_value += std::copysign(std::min(max_move, std::abs(diff)), diff);
+      const ControlState diff = desired_value - m_state;
+      m_state += std::copysign(std::min(max_move, std::abs(diff)), diff);
     }
 
-    return m_value;
+    return m_state;
   }
 
-  mutable ControlState m_value = 0.0;
-  mutable Clock::time_point m_last_update = Clock::now();
+  mutable ControlState m_state = 0;
 };
 
 // usage: toggle(input, [clear])
-// Toggled on press
 class ToggleExpression : public FunctionExpression
 {
 private:
@@ -554,6 +764,11 @@ private:
       return ArgumentsAreValid{};
     else
       return ExpectedArguments{"input, [clear]"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Toggle on press");
   }
 
   ControlState GetValue() const override
@@ -574,126 +789,141 @@ private:
     }
 
     if (GetArgCount() == 2 && GetArg(1).GetValue() > CONDITION_THRESHOLD)
-    {
       m_state = false;
-    }
 
     return m_state;
   }
 
-  mutable bool m_pressed{};
-  mutable bool m_state{};
+  mutable bool m_pressed = false;
+  mutable bool m_state = false;
 };
 
-// usage: onPress(input)
-// Once, every time it starts being pressed
+// usage: onPress(input, duration_frames = 1)
 class OnPressExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 1)
+    if (args.size() >= 1)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input"};
+      return ExpectedArguments{"input, duration_frames = 1"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return "Returns 1 when the input has been pressed, for "
+           "the specified number of frames";
   }
 
   ControlState GetValue() const override
   {
+    const u8 i = u8(ControllerInterface::GetCurrentInputChannel());
+
     const ControlState input = GetArg(0).GetValue();
+    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
 
-    if (input > CONDITION_THRESHOLD)
-    {
-      if (!m_pressed)
-      {
-        m_pressed = true;
-        return 1.0;
-      }
-    }
-    else
-    {
-      m_pressed = false;
-    }
+    if (m_frames_left[i] > 0)
+      m_frames_left[i]--;
 
-    return 0.0;
+    bool was_pressed = m_pressed[i];
+    m_pressed[i] = input > CONDITION_THRESHOLD;
+
+    // Start again on every new press, don't restart on release
+    if (!was_pressed && m_pressed[i])
+      m_frames_left[i] = duration_frames;
+
+    return m_frames_left[i] > 0;
   }
 
-  mutable bool m_pressed{};
+  mutable bool m_pressed[u8(ciface::InputChannel::Max)];
+  mutable u32 m_frames_left[u8(ciface::InputChannel::Max)];
 };
 
-// usage: onRelease(input)
+// usage: onRelease(input, duration_frames = 1)
 class OnReleaseExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 1)
+    if (args.size() >= 1)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input"};
+      return ExpectedArguments{"input, duration_frames = 1"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return "Returns 1 when the input has been released, for "
+           "the specified number of frames";
   }
 
   ControlState GetValue() const override
   {
     const ControlState input = GetArg(0).GetValue();
+    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
 
-    if (input > CONDITION_THRESHOLD)
-    {
-      m_pressed = true;
-    }
-    else if (m_pressed)
-    {
-      m_pressed = false;
-      return 1.0;
-    }
+    if (m_frames_left > 0)
+      m_frames_left--;
 
-    return 0.0;
+    bool was_pressed = m_pressed;
+    m_pressed = input > CONDITION_THRESHOLD;
+
+    // Start again on every new release, don't restart on press
+    if (was_pressed && !m_pressed)
+      m_frames_left = duration_frames;
+
+    return m_frames_left > 0;
   }
 
-  mutable bool m_pressed{};
+  mutable bool m_pressed = false;
+  mutable u32 m_frames_left = 0;
 };
 
-// usage: onChange(input)
-// Returns 1 when the input has changed from the last cached value (has a threshold)
+// usage: onChange(input, duration_frames = 1)
 class OnChangeExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 1)
+    if (args.size() >= 1)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input"};
+      return ExpectedArguments{"input, duration_frames = 1"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return "Returns 1 when the input detection threshold has changed from the previous value,\nfor "
+           "the specified number of frames";
   }
 
   ControlState GetValue() const override
   {
     const ControlState input = GetArg(0).GetValue();
+    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
 
-    bool pressed = false;
-    if (input > CONDITION_THRESHOLD)
-    {
-      pressed = true;
-    }
+    if (m_frames_left > 0)
+      m_frames_left--;
 
-    if (m_pressed != pressed)
-    {
-      m_pressed = pressed;
-      return 1.0;
-    }
+    bool was_pressed = m_pressed;
+    m_pressed = input > CONDITION_THRESHOLD;
 
-    return 0.0;
+    // Start again on every new press or release
+    if (was_pressed != m_pressed)
+      m_frames_left = duration_frames;
+
+    return m_frames_left > 0;
   }
 
-  mutable bool m_pressed{};
+  mutable bool m_pressed = false;
+  mutable u32 m_frames_left = 0;
 };
 
-// usage: cache(input, condition)
-// Caches and returns the input when the condition is true,
-// returns the last cached value when the condition is false
+// usage: cache(expression, condition)
 class CacheExpression : public FunctionExpression
 {
 private:
@@ -703,7 +933,18 @@ private:
     if (args.size() == 2)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, condition"};
+      return ExpectedArguments{"expression, condition"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    if (for_input)
+    {
+      return _trans("Caches and returns the input when the condition is true,\nreturns the "
+                    "cached value when the condition is false");
+    }
+    return _trans("Sets and caches the value when the condition is true, keeps settings the cached "
+                  "value when the condition is false");
   }
 
   ControlState GetValue() const override
@@ -712,18 +953,27 @@ private:
     const ControlState condition = GetArg(1).GetValue();
 
     if (condition > CONDITION_THRESHOLD)
-    {
       m_state = input;
-    }
 
     return m_state;
   }
 
-  mutable ControlState m_state = 0.0;
+  void SetValue(ControlState value) override
+  {
+    const ControlState condition = GetArg(1).GetValue();
+
+    if (condition > CONDITION_THRESHOLD)
+      m_state = value;
+
+    GetArg(0).SetValue(m_state);
+  }
+
+  mutable ControlState m_state = 0;
 };
 
-// usage: hold(input, seconds)
-class HoldExpression : public FunctionExpression
+// usage: onHold(input, seconds)
+// Use real world time for this one as it makes more sense
+class OnHoldExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
@@ -735,11 +985,17 @@ private:
       return ExpectedArguments{"input, seconds"};
   }
 
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns true after being held for the specified amount of time, until released");
+  }
+
   ControlState GetValue() const override
   {
     const auto now = Clock::now();
 
     const ControlState input = GetArg(0).GetValue();
+    const ControlState seconds = GetArg(1).GetValue();
 
     if (input <= CONDITION_THRESHOLD)
     {
@@ -750,7 +1006,7 @@ private:
     {
       const auto hold_time = now - m_start_time;
 
-      if (std::chrono::duration_cast<FSec>(hold_time).count() >= GetArg(1).GetValue())
+      if (std::chrono::duration_cast<FSec>(hold_time).count() >= seconds)
         m_state = true;
     }
 
@@ -758,12 +1014,11 @@ private:
   }
 
   mutable bool m_state = false;
-  mutable Clock::time_point m_start_time = Clock::now();
-};
+  mutable Clock::time_point m_start_time = Clock::now();};
 
-// usage: tap(input, seconds, taps = 2)
-// Double+ click detection
-class TapExpression : public FunctionExpression
+// usage: onTap(input, seconds, taps = 2)
+// Use real world time for this one as it makes more sense
+class OnTapExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
@@ -775,6 +1030,12 @@ private:
       return ExpectedArguments{"input, seconds, taps = 2"};
   }
 
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Double+ tap detection within the specified time.\nKeeps returning 1 until you "
+                  "release the last tap");
+  }
+
   ControlState GetValue() const override
   {
     const auto now = Clock::now();
@@ -784,6 +1045,7 @@ private:
     const ControlState input = GetArg(0).GetValue();
     const ControlState seconds = GetArg(1).GetValue();
 
+    //To review >/>=
     const bool is_time_up = elapsed > seconds;
 
     const u32 desired_taps = GetArgCount() == 3 ? u32(GetArg(2).GetValue() + 0.5) : 2;
@@ -792,28 +1054,23 @@ private:
     {
       m_released = true;
 
+      // Reset taps if enough time has passed from the first one
       if (m_taps > 0 && is_time_up)
-      {
         m_taps = 0;
-      }
+
+      return false;
     }
-    else
+
+    if (m_released)
     {
-      if (m_released)
-      {
-        if (!m_taps)
-        {
-          m_start_time = now;
-        }
+      if (m_taps == 0)
+        m_start_time = now;
 
-        ++m_taps;
-        m_released = false;
-      }
-
-      return desired_taps == m_taps;
+      ++m_taps;
+      m_released = false;
     }
 
-    return 0.0;
+    return desired_taps == m_taps;
   }
 
   mutable bool m_released = true;
@@ -821,18 +1078,24 @@ private:
   mutable Clock::time_point m_start_time = Clock::now();
 };
 
-// usage: relative(input, speed, [max_abs_value], [shared_state])
-// speed is max movement per second
+//To explain about shared_state, expecting to be a VariableExpression
+// usage: relative(input, speed = 0, [max_abs_value], [shared_state])
 class RelativeExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() >= 2 && args.size() <= 4)
+    if (args.size() >= 1 && args.size() <= 4)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, speed, [max_abs_value], [shared_state]"};
+      return ExpectedArguments{"input, speed = 0, [max_abs_value], [shared_state]"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans(
+        "Returns the relative change of an input, clamped by speed per second if it's > 0");
   }
 
   ControlState GetValue() const override
@@ -851,34 +1114,30 @@ private:
     // (Adjustments created by `Down` are applied negatively to the shared state)
     //  relative(`Down`, 2.0, -1.0, $y)
 
-    const auto now = Clock::now();
+    const ControlState input = GetArg(0).GetValue();
+    const ControlState speed = (GetArgCount() >= 2) ? GetArg(1).GetValue() : 0.0;
+
+    const ControlState max_abs_value = (GetArgCount() >= 3) ? GetArg(2).GetValue() : 1.0;
 
     if (GetArgCount() >= 4)
       m_state = GetArg(3).GetValue();
 
-    const auto elapsed = std::chrono::duration_cast<FSec>(now - m_last_update).count();
-    m_last_update = now;
-
-    const ControlState input = GetArg(0).GetValue();
-    const ControlState speed = GetArg(1).GetValue();
-
-    const ControlState max_abs_value = (GetArgCount() >= 3) ? GetArg(2).GetValue() : 1.0;
-
-    const ControlState max_move = input * elapsed * speed;
+    const ControlState max_move =
+        input *
+        ((speed > 0.0) ? (ControllerInterface::GetCurrentInputDeltaSeconds() * speed) : 1.0);
     const ControlState diff_from_zero = std::abs(0.0 - m_state);
     const ControlState diff_from_max = std::abs(max_abs_value - m_state);
 
     m_state += std::min(std::max(max_move, -diff_from_zero), diff_from_max) *
                std::copysign(1.0, max_abs_value);
-
+    
     if (GetArgCount() >= 4)
       const_cast<Expression&>(GetArg(3)).SetValue(m_state);
 
     return std::max(0.0, m_state * std::copysign(1.0, max_abs_value));
   }
 
-  mutable ControlState m_state = 0.0;
-  mutable Clock::time_point m_last_update = Clock::now();
+  mutable ControlState m_state = 0;
 };
 
 // usage: pulse(input, seconds)
@@ -894,11 +1153,16 @@ private:
       return ExpectedArguments{"input, seconds"};
   }
 
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans(
+        "Keeps the value true for \"seconds\" (increasingly) every time you press the input");
+  }
+
   ControlState GetValue() const override
   {
-    const auto now = Clock::now();
-
     const ControlState input = GetArg(0).GetValue();
+    const ControlState seconds = GetArg(1).GetValue();
 
     if (input <= CONDITION_THRESHOLD)
     {
@@ -908,8 +1172,6 @@ private:
     {
       m_released = false;
 
-      const auto seconds = std::chrono::duration_cast<Clock::duration>(FSec(GetArg(1).GetValue()));
-
       if (m_state)
       {
         m_release_time += seconds;
@@ -917,21 +1179,247 @@ private:
       else
       {
         m_state = true;
-        m_release_time = now + seconds;
+        m_release_time = seconds;
       }
     }
 
-    if (m_state && now >= m_release_time)
+    if (m_state && m_release_time <= 0.0)
     {
       m_state = false;
     }
+    m_release_time =
+        std::max(0.0, m_release_time - ControllerInterface::GetCurrentInputDeltaSeconds());
 
     return m_state;
   }
 
   mutable bool m_released = false;
   mutable bool m_state = false;
-  mutable Clock::time_point m_release_time = Clock::now();
+  mutable double m_release_time = 0.0;
+};
+
+// usage: ignoreFocus(expression)
+class IgnoreFocusExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"expression"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Forces the focus requirements of the expression to be ignored");
+  }
+
+  // No need to keep the inner expression flags as they'd be ignored anyway
+  Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
+
+  ControlState GetValue() const override { return GetArg(0).GetValue(); }
+};
+
+// usage: ignoreOnFocusChange(expression)
+class IgnoreOnFocusChangeExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"expression"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Forces the expression to be ignored until on focus acquired");
+  }
+
+  Device::FocusFlags GetFocusFlags() const override
+  {
+    // Add the required flag, keep the previous ones, as long as they don't conflict
+    u8 focus_flags = u8(FunctionExpression::GetFocusFlags());
+    focus_flags &= ~u8(Device::FocusFlags::IgnoreFocus);
+    return Device::FocusFlags(focus_flags | u8(Device::FocusFlags::IgnoreOnFocusChanged));
+  }
+
+  ControlState GetValue() const override { return GetArg(0).GetValue(); }
+};
+
+// usage: requireFocus(expression)
+// This already enforces check for Full Focus, we shouldn't need one for Focus only.
+class RequireFocusExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"expression"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Forces focus to be checked on the expression.\nThis is mostly needed for "
+                  "outputs which ignore focus by default");
+  }
+
+  Device::FocusFlags GetFocusFlags() const override
+  {
+    // Add the required flag, keep the previous ones, as long as they don't conflict
+    u8 focus_flags = u8(FunctionExpression::GetFocusFlags());
+    focus_flags &= ~u8(Device::FocusFlags::IgnoreFocus);
+    return Device::FocusFlags(focus_flags | u8(Device::FocusFlags::RequireFullFocus));
+  }
+
+  ControlState GetValue() const override { return GetArg(0).GetValue(); }
+};
+
+// usage: (return value)gameSpeed()
+// We don't want this to be used as control so we don't return 1 to CountNumControls()
+class GameSpeedExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 0)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"none"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Returns the game speed from the last frame (1 is full speed). Can be used "
+                  "similarly to a time delta");
+  }
+
+  ControlState GetValue() const override
+  {
+    // This will return 1 when the emulation is not running, wether in the UI or not
+    return 1.0;
+    // TODO: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic)
+  }
+};
+
+//To finish: not sure this works
+// usage: timeToInputFrames(seconds)
+class TimeToInputFramesExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"seconds"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("If you don't want to deal with input update calculations you can use\n"
+                  "this function to convert seconds to input frames.\nYou can't preview "
+                  "values when the emulation is not running");
+  }
+
+  ControlState GetValue() const override
+  {
+    return GetArg(0).GetValue() / ControllerInterface::GetCurrentInputDeltaSeconds();
+  }
+};
+
+// usage: gameToInputFrames(frames)
+class GameToInputFramesExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"frames"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans(
+        "Input isn't updated at the same frequency as the game video,\nso some functions ask "
+        "for a duration in input frames.\nUse this to convert to it.\nYou can't preview "
+        "values when the emulation is not running.\nIgnored for non game mappings");
+  }
+
+  ControlState GetValue() const override
+  {
+    if (ControllerInterface::GetCurrentInputChannel() == InputChannel::Host ||
+        ::Core::GetState() == ::Core::State::Uninitialized)
+      return GetArg(0).GetValue();
+    //To finish: it doesn't work now? (make sure it's thread safe)
+    return GetArg(0).GetValue() * (ControllerInterface::GetCurrentInputDeltaSeconds() / (VideoInterface::GetTargetRefreshRate() * 0.5));
+  }
+};
+
+// usage: (return value)hasFocus()
+// We don't want this to be used as control so we don't return 1 to CountNumControls()
+class HasFocusExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 0)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"none"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Can be used to cache inputs values on focus loss, or to trigger inputs the "
+                  "window loses focus,\nlike pausing "
+                  "the game pause or changing the emulation speed");
+  }
+
+  Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
+
+  // There is no need to cache this, nor to return the control gate cached version of focus,
+  // we want this to be as up to date as possible
+  ControlState GetValue() const override { return Host_RendererHasFocus(); }
+};
+
+// usage: scaleSet(output, scale)
+class ScaleSetExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 2)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"output, scale"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    if (for_input)
+      return nullptr;
+    return _trans("Scales an output value");
+  }
+
+  void SetValue(ControlState value) override { GetArg(0).SetValue(value * GetArg(1).GetValue()); }
+
+  // Just return a multiplication if this was accidentally used on inputs
+  ControlState GetValue() const override { return GetArg(0).GetValue() * GetArg(1).GetValue(); }
 };
 
 std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name)
@@ -974,14 +1462,14 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<OnReleaseExpression>();
   if (name == "onChange")
     return std::make_unique<OnChangeExpression>();
-  if (name == "cache")
+  if (name == "cache")  // Output as well
     return std::make_unique<CacheExpression>();
-  if (name == "hold")
-    return std::make_unique<HoldExpression>();
+  if (name == "onHold" || name == "hold")
+    return std::make_unique<OnHoldExpression>();
   if (name == "toggle")
     return std::make_unique<ToggleExpression>();
-  if (name == "tap")
-    return std::make_unique<TapExpression>();
+  if (name == "onTap" || name == "tap")
+    return std::make_unique<OnTapExpression>();
   if (name == "relative")
     return std::make_unique<RelativeExpression>();
   if (name == "smooth")
@@ -990,6 +1478,19 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<PulseExpression>();
   if (name == "timer")
     return std::make_unique<TimerExpression>();
+  if (name == "interval")
+    return std::make_unique<IntervalExpression>();
+  // Recordings:
+  if (name == "average")
+    return std::make_unique<AverageExpression>();
+  if (name == "sum")
+    return std::make_unique<SumExpression>();
+  if (name == "record")
+    return std::make_unique<RecordExpression>();
+  if (name == "sequence")
+    return std::make_unique<SequenceExpression>();
+  if (name == "lag")
+    return std::make_unique<LagExpression>();
   // Stick helpers:
   if (name == "deadzone")
     return std::make_unique<DeadzoneExpression>();
@@ -999,6 +1500,24 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<BezierCurveExpression>();
   if (name == "antiAcceleration")
     return std::make_unique<AntiAccelerationExpression>();
+  // Meta/Focus:
+  if (name == "gameSpeed")
+    return std::make_unique<GameSpeedExpression>();
+  if (name == "timeToInputFrames")
+    return std::make_unique<TimeToInputFramesExpression>();
+  if (name == "gameToInputFrames")
+    return std::make_unique<GameToInputFramesExpression>();
+  if (name == "hasFocus")
+    return std::make_unique<HasFocusExpression>();
+  if (name == "ignoreFocus")
+    return std::make_unique<IgnoreFocusExpression>();
+  if (name == "ignoreOnFocusChange")
+    return std::make_unique<IgnoreOnFocusChangeExpression>();
+  if (name == "requireFocus")
+    return std::make_unique<RequireFocusExpression>();
+  // Setter/Output:
+  if (name == "scaleSet")
+    return std::make_unique<ScaleSetExpression>();
 
   return nullptr;
 }
@@ -1013,10 +1532,21 @@ int FunctionExpression::CountNumControls() const
   return result;
 }
 
-void FunctionExpression::UpdateReferences(ControlEnvironment& env)
+Device::FocusFlags FunctionExpression::GetFocusFlags() const
+{
+  u8 focus_flags = 0;
+  if (m_args.size() == 0)
+    focus_flags = u8(Device::FocusFlags::Default);
+  // By default functions sum up all the focus requirements of their args
+  for (u32 i = 0; i < u32(m_args.size()); ++i)
+    focus_flags |= u8(GetArg(i).GetFocusFlags());
+  return Device::FocusFlags(focus_flags);
+}
+
+void FunctionExpression::UpdateReferences(ControlEnvironment& env, bool is_input)
 {
   for (auto& arg : m_args)
-    arg->UpdateReferences(env);
+    arg->UpdateReferences(env, is_input);
 }
 
 FunctionExpression::ArgumentValidation
@@ -1042,8 +1572,15 @@ u32 FunctionExpression::GetArgCount() const
   return u32(m_args.size());
 }
 
-void FunctionExpression::SetValue(ControlState)
+//To review: insane?
+void FunctionExpression::SetValue(ControlState value)
 {
+  // By default just pass along all the values and ignore the function as
+  // the expression will build fine even if it's an output reference
+  for (auto& arg : m_args)
+  {
+    arg->SetValue(value);
+  }
 }
-
 }  // namespace ciface::ExpressionParser
+#pragma optimize("", on)

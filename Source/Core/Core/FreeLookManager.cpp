@@ -100,6 +100,8 @@ void FreeLookController::LoadDefaults(const ControllerInterface& ciface)
 {
   EmulatedController::LoadDefaults(ciface);
 
+  const auto lock = GetStateLock();
+
   auto hotkey_string = [](std::vector<std::string> inputs) {
     return "@(" + JoinStrings(inputs, "+") + ')';
   };
@@ -146,6 +148,8 @@ ControllerEmu::ControlGroup* FreeLookController::GetGroup(FreeLookGroup group) c
 
 void FreeLookController::Update()
 {
+  CacheInput();
+
   if (!g_freelook_camera.IsActive())
     return;
 

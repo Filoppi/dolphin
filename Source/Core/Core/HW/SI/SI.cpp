@@ -18,6 +18,7 @@
 #include "Common/Swap.h"
 #include "Core/ConfigManager.h"
 #include "Core/CoreTiming.h"
+#include "Core/HW/VideoInterface.h"
 #include "Core/HW/MMIO.h"
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/HW/SI/SI_DeviceGBA.h"
@@ -26,6 +27,7 @@
 #include "Core/NetPlayProto.h"
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
+#include "InputCommon/ControlReference/ControlReference.h"
 
 namespace SerialInterface
 {
@@ -635,7 +637,7 @@ static void ChangeDeviceDeterministic(SIDevices device, int channel)
   CoreTiming::ScheduleEvent(SystemTimers::GetTicksPerSecond(), s_change_device_event, channel);
 }
 
-void UpdateDevices()
+void UpdateDevices(double delta_seconds)
 {
   // Check for device change requests:
   for (int i = 0; i != MAX_SI_CHANNELS; ++i)
@@ -653,9 +655,10 @@ void UpdateDevices()
   // succession, in order to optimize networking
   NetPlay::SetSIPollBatching(true);
 
-  // Update inputs at the rate of SI
-  // Typically 120hz but is variable
-  g_controller_interface.UpdateInput();
+  ControlReference::UpdateGate(!SConfig::GetInstance().m_BackgroundInput,
+                               SConfig::GetInstance().bLockCursor, true,
+                               ciface::InputChannel::SerialInterface);
+  g_controller_interface.UpdateInput(ciface::InputChannel::SerialInterface, delta_seconds);
 
   // Update channels and set the status bit if there's new data
   s_status_reg.RDST0 =

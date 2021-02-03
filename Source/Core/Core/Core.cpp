@@ -74,7 +74,6 @@
 #include "Core/MemoryWatcher.h"
 #endif
 
-#include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/GCAdapter.h"
 
@@ -431,6 +430,10 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     s_is_started = false;
     s_is_stopping = false;
     s_wants_determinism = false;
+
+    // Reset output and relative input of game input channels
+    g_controller_interface.Reset(ciface::InputChannel::SerialInterface);
+    g_controller_interface.Reset(ciface::InputChannel::Bluetooth);
 
     if (s_on_state_changed_callback)
       s_on_state_changed_callback(State::Uninitialized);
@@ -1079,12 +1082,6 @@ void DoFrameStep()
     // if not paused yet, pause immediately instead
     SetState(State::Paused);
   }
-}
-
-void UpdateInputGate(bool require_focus)
-{
-  ControlReference::SetInputGate((!require_focus || Host_RendererHasFocus()) &&
-                                 !Host_UIBlocksControllerState());
 }
 
 }  // namespace Core

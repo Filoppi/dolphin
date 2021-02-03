@@ -25,6 +25,10 @@
 #include "Core/HotkeyManager.h"
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/USB/Bluetooth/BTBase.h"
+#include "Core/HW/Wiimote.h"
+#include "Core/HW/SI/SI_Device.h"
+#include "Core/HW/GCPad.h"
+#include "Core/HW/GCKeyboard.h"
 #include "Core/State.h"
 
 #include "DolphinQt/Settings.h"
@@ -38,6 +42,7 @@
 #include "VideoCommon/VideoConfig.h"
 
 constexpr const char* DUBOIS_ALGORITHM_SHADER = "dubois";
+constexpr u32 UPDATE_FREQUENCY = 60;
 
 HotkeyScheduler::HotkeyScheduler() : m_stop_requested(false)
 {
@@ -137,12 +142,57 @@ void HotkeyScheduler::Run()
 {
   Common::SetCurrentThreadName("HotkeyScheduler");
 
+  double remainder = 0.0;
   while (!m_stop_requested.IsSet())
   {
-    Common::SleepCurrentThread(1000 / 60);
+    //To compare executions in 100s with both versions. Also remove comment below if you remove this and double remainder above.
+    constexpr double TARGET_MS_TO_SLEEP = 1000.0 / UPDATE_FREQUENCY;
+    constexpr double BASE_MS_TO_SLEEP = int(TARGET_MS_TO_SLEEP);
+    constexpr double REMAINDER_MS_TO_SLEEP = TARGET_MS_TO_SLEEP - BASE_MS_TO_SLEEP;
+    int current_ms_to_sleep = int(BASE_MS_TO_SLEEP + remainder);
+    remainder = remainder - int(remainder);
+    // Not sure why we sleep before the first cycle and not after it
+    Common::SleepCurrentThread(current_ms_to_sleep);
+    remainder += REMAINDER_MS_TO_SLEEP;
 
-    if (Core::GetState() == Core::State::Uninitialized || Core::GetState() == Core::State::Paused)
-      g_controller_interface.UpdateInput();
+    // We always pass in UPDATE_FREQUENCY as the input doesn't care about sleep ms variations
+    g_controller_interface.UpdateInput(ciface::InputChannel::Host, 1.0 / UPDATE_FREQUENCY);
+
+    // Cache input for emulation related controllers when emulation is not running (for UI).
+    // As an optimization we only process currently attached controllers, but we don't have to.
+    // While this doesn't seem thread safe, caching input already has its thread locking inside.
+    if (Core::GetState() == Core::State::Uninitialized)
+    {
+      // Wii Remotes aren't updated when emulating GC but they are also not accessible from the UI
+      // so we wouldn't need to cache them
+      InputConfig* config;
+      if (!SConfig::GetInstance().m_bt_passthrough_enabled)
+      {
+        config = Wiimote::GetConfig();
+        for (int i = 0; i < config->GetControllersNum(); ++i)
+        {
+          if (WiimoteCommon::GetSource(unsigned int(i)) == WiimoteSource::Emulated)
+            config->GetController(i)->CacheInput();
+        }
+      }
+      config = Pad::GetConfig();
+      for (int i = 0; i < config->GetControllersNum(); ++i)
+      {
+        if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[i]))
+          config->GetController(i)->CacheInput();
+      }
+      config = Keyboard::GetConfig();
+      for (int i = 0; i < config->GetControllersNum(); ++i)
+      {
+        if (SConfig::GetInstance().m_SIDevice[i] ==
+            SerialInterface::SIDevices::SIDEVICE_GC_KEYBOARD)
+        {
+          config->GetController(i)->CacheInput();
+        }
+      }
+    }
+
+    FreeLook::UpdateInput();
 
     if (!HotkeyManagerEmu::IsEnabled())
       continue;
@@ -150,12 +200,13 @@ void HotkeyScheduler::Run()
     if (Core::GetState() != Core::State::Stopping)
     {
       // Obey window focus (config permitting) before checking hotkeys.
-      Core::UpdateInputGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS));
+      ControlReference::UpdateGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS), false, true,
+                                   ciface::InputChannel::Host);
 
       HotkeyManagerEmu::GetStatus();
 
       // Everything else on the host thread (controller config dialog) should always get input.
-      ControlReference::SetInputGate(true);
+      ControlReference::SetCurrentGateOpen();
 
       if (!Core::IsRunningAndStarted())
         continue;
@@ -206,6 +257,10 @@ void HotkeyScheduler::Run()
       // Exit
       if (IsHotkey(HK_EXIT))
         emit ExitHotkey();
+
+      // Unlock Cursor
+      if (IsHotkey(HK_UNLOCK_CURSOR))
+        emit UnlockCursor();
 
       auto& settings = Settings::Instance();
 
@@ -546,8 +601,6 @@ void HotkeyScheduler::Run()
       OSD::AddMessage(StringFromFormat("Free Look: %s", new_value ? "Enabled" : "Disabled"));
     }
 
-    FreeLook::UpdateInput();
-
     // Savestates
     for (u32 i = 0; i < State::NUM_STATES; i++)
     {
@@ -579,6 +632,8 @@ void HotkeyScheduler::Run()
     if (IsHotkey(HK_SAVE_STATE_FILE))
       emit StateSaveFile();
   }
+
+  g_controller_interface.Reset(ciface::InputChannel::Host);
 }
 
 void HotkeyScheduler::CheckDebuggingHotkeys()
