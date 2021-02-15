@@ -295,7 +295,6 @@ private:
   }
 };
 
-//To finish IntervalExpression, RecordExpression, SequenceExpression, LagExpression, Average, Sum
 //To test all functions and check all ControllerInterface::GetCurrentInputDeltaSeconds(). smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
 
 // usage: interval(delay_frames, duration_frames)
@@ -313,32 +312,35 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Returns 1 for \"duration_frames\" every \"delay_frames\"");
+    return _trans(
+        "Returns 1 for \"duration_frames\" every \"delay_frames\" (while it keeps counting them)");
   }
 
   ControlState GetValue() const override
   {
-    const u32 delay_frames = u32(GetArg(0).GetValue() + 0.5);
-    const u32 duration_frames = u32(GetArg(1).GetValue() + 0.5);
-    if (delay_frames >= delay_frame_counter)
+    const u32 delay_frames = u32(std::max(GetArg(0).GetValue() + 0.5, 0.0));
+    const u32 duration_frames = u32(std::max(GetArg(1).GetValue() + 0.5, 0.0));
+
+    if (duration_frames_counter > 0)
     {
-      delay_frame_counter = 0;
-      duration_frame_counter++;
+      --duration_frames_counter;
     }
-    if (duration_frames < duration_frame_counter)
+
+    if (delay_frames_counter >= delay_frames)
     {
-      m_cached_values.push_back(1.0);
+      duration_frames_counter = duration_frames;
+      delay_frames_counter = 0;
     }
     else
     {
-      delay_frame_counter++;
+      delay_frames_counter++;
     }
-    return m_cached_values.back();
+
+    return duration_frames_counter > 0;
   }
 
-  mutable std::vector<ControlState> m_cached_values;
-  mutable u32 delay_frame_counter;
-  mutable u32 duration_frame_counter;
+  mutable u32 delay_frames_counter = 0;
+  mutable u32 duration_frames_counter = 0;
 };
 
 // usage: sequence(input, value_0, value_1, ...)
@@ -366,7 +368,7 @@ private:
     // We need to retrieve all the states for consistency, though for this
     // we should "enforce" literal expressions which don't have a state
     std::vector<ControlState> sequence;
-    u32 sequence_length = GetArgCount() - 1;
+    const u32 sequence_length = GetArgCount() - 1;
     sequence.reserve(sequence_length);
     for (u32 i = 1; i < GetArgCount(); ++i)
       sequence.push_back(GetArg(i).GetValue());
@@ -387,8 +389,7 @@ private:
       return 0;
     }
 
-    // Increase the index
-    return sequence[m_index++];
+    return sequence[m_index++];  // Increase the index
   }
 
   mutable u32 m_index = 0;
@@ -396,28 +397,74 @@ private:
   mutable bool m_started = false;
 };
 
-// usage: record(input, playback_input)
+// usage: record(input, record_input, playback_input)
 class RecordExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 2)
+    if (args.size() == 3)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, playback_input"};
+      return ExpectedArguments{"input, record_input, playback_input"};
   }
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("It will record (and output) when \"input\" is held down, and playback when "
-                  "\"playback_input\" is pressed");
+    return _trans("It will record \"input\" while \"record_input\" is held down,\nand "
+                  "playback when \"playback_input\" is pressed.\n\"input\" is passed through "
+                  "otherwise. Recordings are not saved");
   }
 
-  ControlState GetValue() const override { return 0; }
+  ControlState GetValue() const override
+  {
+    const ControlState input = GetArg(0).GetValue();
+    const ControlState record_input = GetArg(1).GetValue();
+    const ControlState playback_input = GetArg(2).GetValue();
 
-  mutable std::vector<ControlState> m_cached_values;
+    if (record_input > CONDITION_THRESHOLD && !m_record_pressed)
+    {
+      m_recording = true;
+      m_playing_back = false;
+      m_recorded_states.clear();
+    }
+    else if (record_input <= CONDITION_THRESHOLD && m_record_pressed)
+    {
+      m_recording = false;
+    }
+    m_record_pressed = record_input > CONDITION_THRESHOLD;
+
+    if (!m_recording && m_recorded_states.size() > 0 && playback_input > CONDITION_THRESHOLD &&
+        !m_playback_pressed)
+    {
+      m_playing_back = true;
+      m_index = 0;
+    }
+    m_playback_pressed = playback_input > CONDITION_THRESHOLD;
+
+    if (m_recording)
+    {
+      m_recorded_states.push_back(input);
+    }
+    else if (m_playing_back)
+    {
+      ++m_index;
+      if (m_index >= m_recorded_states.size())
+      {
+        m_playing_back = false;
+      }
+      return m_recorded_states[m_index - 1];
+    }
+    return input;
+  }
+
+  mutable std::vector<ControlState> m_recorded_states;
+  mutable u32 m_index = 0;
+  mutable bool m_record_pressed = false;
+  mutable bool m_playback_pressed = false;
+  mutable bool m_recording = false;
+  mutable bool m_playing_back = false;
 };
 
 // usage: lag(input, lag_frames)
@@ -438,9 +485,30 @@ private:
     return _trans("Will lag the input by \"lag_frames\"");
   }
 
-  ControlState GetValue() const override { return 0; }
+  ControlState GetValue() const override
+  {
+    const ControlState input = GetArg(0).GetValue();
+    const size_t lag_frames = size_t(std::max(GetArg(1).GetValue() + 0.5, 0.0));
+    
+    m_cached_states.reserve(lag_frames + 1);
 
-  mutable std::vector<ControlState> m_cached_values;
+    while (m_cached_states.size() < lag_frames)
+    {
+      m_cached_states.push_back(0);
+    }
+
+    m_cached_states.insert(m_cached_states.begin(), input);
+
+    const ControlState oldest_state = m_cached_states[lag_frames];
+    while (m_cached_states.size() > lag_frames)
+    {
+      m_cached_states.pop_back();
+    }
+
+    return oldest_state;
+  }
+
+  mutable std::vector<ControlState> m_cached_states;
 };
 
 // usage: average(input, frames)
@@ -461,9 +529,30 @@ private:
     return _trans("Returns the average of the input over the specified number of frames");
   }
 
-  ControlState GetValue() const override { return 0; }
+  ControlState GetValue() const override
+  {
+    const ControlState input = GetArg(0).GetValue();
+    // Note that if you increase this at runtime, we won't have the corresponding values
+    const size_t frames = size_t(std::max(GetArg(1).GetValue() + 0.5, 1.0));
 
-  mutable std::vector<ControlState> m_cached_values;
+    m_cached_states.reserve(frames + 1);
+
+    m_cached_states.insert(m_cached_states.begin(), input);
+    while (m_cached_states.size() > frames)
+    {
+      m_cached_states.pop_back();
+    }
+
+    ControlState sum = 0.0;
+    for (ControlState cached_state : m_cached_states)
+    {
+      sum += cached_state;
+    }
+
+    return sum / std::min(m_cached_states.size(), frames);
+  }
+
+  mutable std::vector<ControlState> m_cached_states;
 };
 
 // usage: sum(input, frames)
@@ -487,9 +576,29 @@ private:
                   "this on relative inputs to avoid losing values not read by the game");
   }
 
-  ControlState GetValue() const override { return 0; }
+  ControlState GetValue() const override
+  {
+    const ControlState input = GetArg(0).GetValue();
+    // Note that if you increase this at runtime, we won't have the corresponding values
+    const size_t frames = size_t(std::max(GetArg(1).GetValue() + 0.5, 1.0));
 
-  mutable std::vector<ControlState> m_cached_values;
+    m_cached_states.reserve(frames + 1);
+
+    m_cached_states.insert(m_cached_states.begin(), input);
+    while (m_cached_states.size() > frames)
+    {
+      m_cached_states.pop_back();
+    }
+
+    ControlState sum = 0.0;
+    for (ControlState cached_state : m_cached_states)
+    {
+      sum += cached_state;
+    }
+    return sum;
+  }
+
+  mutable std::vector<ControlState> m_cached_states;
 };
 
 // usage: timer(seconds)
@@ -819,26 +928,25 @@ private:
 
   ControlState GetValue() const override
   {
-    const u8 i = u8(ControllerInterface::GetCurrentInputChannel());
-
     const ControlState input = GetArg(0).GetValue();
-    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
+    const u32 duration_frames =
+        GetArgCount() >= 2 ? u32(std::max(GetArg(1).GetValue() + 0.5, 0.0)) : 1;
 
-    if (m_frames_left[i] > 0)
-      m_frames_left[i]--;
+    if (m_frames_left > 0)
+      m_frames_left--;
 
-    bool was_pressed = m_pressed[i];
-    m_pressed[i] = input > CONDITION_THRESHOLD;
+    const bool was_pressed = m_pressed;
+    m_pressed = input > CONDITION_THRESHOLD;
 
     // Start again on every new press, don't restart on release
-    if (!was_pressed && m_pressed[i])
-      m_frames_left[i] = duration_frames;
+    if (!was_pressed && m_pressed)
+      m_frames_left = duration_frames;
 
-    return m_frames_left[i] > 0;
+    return m_frames_left > 0;
   }
 
-  mutable bool m_pressed[u8(ciface::InputChannel::Max)];
-  mutable u32 m_frames_left[u8(ciface::InputChannel::Max)];
+  mutable bool m_pressed = false;
+  mutable u32 m_frames_left = 0;
 };
 
 // usage: onRelease(input, duration_frames = 1)
@@ -863,12 +971,13 @@ private:
   ControlState GetValue() const override
   {
     const ControlState input = GetArg(0).GetValue();
-    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
+    const u32 duration_frames =
+        GetArgCount() >= 2 ? u32(std::max(GetArg(1).GetValue() + 0.5, 0.0)) : 1;
 
     if (m_frames_left > 0)
       m_frames_left--;
 
-    bool was_pressed = m_pressed;
+    const bool was_pressed = m_pressed;
     m_pressed = input > CONDITION_THRESHOLD;
 
     // Start again on every new release, don't restart on press
@@ -904,12 +1013,13 @@ private:
   ControlState GetValue() const override
   {
     const ControlState input = GetArg(0).GetValue();
-    const u32 duration_frames = GetArgCount() >= 2 ? u32(GetArg(1).GetValue() + 0.5) : 1;
+    const u32 duration_frames =
+        GetArgCount() >= 2 ? u32(std::max(GetArg(1).GetValue() + 0.5, 0.0)) : 1;
 
     if (m_frames_left > 0)
       m_frames_left--;
 
-    bool was_pressed = m_pressed;
+    const bool was_pressed = m_pressed;
     m_pressed = input > CONDITION_THRESHOLD;
 
     // Start again on every new press or release
@@ -1048,7 +1158,8 @@ private:
     //To review >/>=
     const bool is_time_up = elapsed > seconds;
 
-    const u32 desired_taps = GetArgCount() == 3 ? u32(GetArg(2).GetValue() + 0.5) : 2;
+    const u32 desired_taps =
+        GetArgCount() == 3 ? u32(std::max(GetArg(2).GetValue() + 0.5, 0.0)) : 2;
 
     if (input <= CONDITION_THRESHOLD)
     {
