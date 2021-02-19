@@ -140,22 +140,21 @@ bool Device::Control::IsMatchingName(std::string_view name) const
   return GetName() == name;
 }
 
-void Device::Output::SetState(ControlState state, void* source_object)
+void Device::Output::SetState(ControlState state, const void* source_object)
 {
   if (state == 0.f)
     states.erase(source_object);
   else
     states[source_object] = state;  // Add or update the value
 
-  //To review: actually, we want the sum as if two outputs set 0.5, we want 1 as final state
-  // Find the max value and only set it if is changed.
-  // We assume the max is always what we want, if not, we could have different settings.
-  std::map<void*, ControlState>::iterator max_state = std::max_element(
-      states.begin(), states.end(),
-      [](const std::pair<void*, ControlState>& a, const std::pair<void*, ControlState>& b) -> bool {
-        return a.second < b.second;
-      });
-  const ControlState final_state = (max_state != states.end()) ? max_state->second : 0;
+  //To test
+  // Find the sum and only set it if is changed.
+  // We assume the sum is always what we want, if not, we could have different settings.
+  const ControlState final_state =
+      std::accumulate(std::begin(states), std::end(states), 0,
+                      [](const ControlState value, const std::pair<const void*, ControlState>& p) {
+                        return value + p.second;
+                      });
   if (m_final_state != final_state)
   {
     m_final_state = final_state;
