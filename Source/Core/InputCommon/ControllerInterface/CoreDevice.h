@@ -225,20 +225,20 @@ protected:
   // An output on a device.
   // State 0 is expected to be the resting value.
   // It has a map of states as different objects can set its value.
-  // The max value will automatically be selected.
+  // The sum of all the states will be used as output.
   // You are responsible of calling SetState(0, source_object) after calling it with any other val.
   //
   class Output : public Control
   {
   public:
     virtual ~Output() = default;
-    void SetState(ControlState state, void* source_object);
+    void SetState(ControlState state, const void* source_object);
     Output* ToOutput() override { return this; }
     void ResetState() override;
 
   private:
     virtual void SetStateInternal(ControlState state) = 0;
-    std::map<void*, ControlState> states;
+    std::map<const void*, ControlState> states;
     ControlState m_final_state = 0;
   };
 
