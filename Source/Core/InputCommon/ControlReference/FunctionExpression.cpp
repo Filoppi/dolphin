@@ -295,7 +295,7 @@ private:
   }
 };
 
-//To test all functions and check all ControllerInterface::GetCurrentInputDeltaSeconds(). smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
+//To test all functions. smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
 
 // usage: interval(delay_frames, duration_frames)
 class IntervalExpression : public FunctionExpression
@@ -482,7 +482,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Will lag the input by \"lag_frames\"");
+    return _trans("Will lag (delay) the input by \"lag_frames\"");
   }
 
   ControlState GetValue() const override
@@ -1190,8 +1190,8 @@ private:
 };
 
 //To explain about shared_state, expecting to be a VariableExpression
-// usage: relative(input, speed = 0, [max_abs_value], [shared_state])
-class RelativeExpression : public FunctionExpression
+// usage: toRelative(input, speed = 0, [max_abs_value], [shared_state])
+class ToRelativeExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
@@ -1249,6 +1249,32 @@ private:
   }
 
   mutable ControlState m_state = 0;
+};
+
+// usage: relativeToSpeed(input)
+class RelativeToSpeedExpression : public FunctionExpression
+{
+private:
+  ArgumentValidation
+  ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
+  {
+    if (args.size() == 1)
+      return ArgumentsAreValid{};
+    else
+      return ExpectedArguments{"input"};
+  }
+
+  const char* GetDescription(bool for_input) const override
+  {
+    return _trans("Turns a relative axis into a rate of change (speed).\nCan be used to map a "
+                  "mouse axis to an analog stick for example");
+  }
+
+  ControlState GetValue() const override
+  {
+    //To review: multiply by "ControllerInterface::GetInputDeltaSeconds() / ControllerInterface::GetTargetInputDeltaSeconds()"?
+    return GetArg(0).GetValue() * ControllerInterface::GetTargetInputDeltaSeconds();
+  }
 };
 
 // usage: pulse(input, seconds)
@@ -1417,11 +1443,10 @@ private:
   {
     // This will return 1 when the emulation is not running, wether in the UI or not
     return 1.0;
-    // TODO: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic)
+    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic)
   }
 };
 
-//To finish: not sure this works
 // usage: timeToInputFrames(seconds)
 class TimeToInputFramesExpression : public FunctionExpression
 {
@@ -1444,7 +1469,7 @@ private:
 
   ControlState GetValue() const override
   {
-    return GetArg(0).GetValue() / ControllerInterface::GetCurrentInputDeltaSeconds();
+    return GetArg(0).GetValue() / ControllerInterface::GetTargetInputDeltaSeconds();
   }
 };
 
@@ -1465,17 +1490,21 @@ private:
   {
     return _trans(
         "Input isn't updated at the same frequency as the game video,\nso some functions ask "
-        "for a duration in input frames.\nUse this to convert to it.\nYou can't preview "
-        "values when the emulation is not running.\nIgnored for non game mappings");
+        "for a duration in input frames.\nUse this to convert to it as not all input frames are\n"
+        "guaranteed to be read by the game.\nThe actual game frame rate won't influence this.\nYou "
+        "can't preview  values when the emulation is not running.\n"
+        "Ignored for non game mappings");
   }
 
   ControlState GetValue() const override
   {
-    if (ControllerInterface::GetCurrentInputChannel() == InputChannel::Host ||
+    if ((ControllerInterface::GetCurrentInputChannel() != InputChannel::SerialInterface &&
+         ControllerInterface::GetCurrentInputChannel() != InputChannel::Bluetooth) ||
         ::Core::GetState() == ::Core::State::Uninitialized)
       return GetArg(0).GetValue();
-    //To finish: it doesn't work now? (make sure it's thread safe)
-    return GetArg(0).GetValue() * (ControllerInterface::GetCurrentInputDeltaSeconds() / (VideoInterface::GetTargetRefreshRate() * 0.5));
+    // GetTargetRefreshRate() is double of the actual video frame rate
+    return GetArg(0).GetValue() * (ControllerInterface::GetTargetInputDeltaSeconds() *
+                                   (VideoInterface::GetTargetRefreshRate() * 0.5));
   }
 };
 
@@ -1581,8 +1610,10 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<ToggleExpression>();
   if (name == "onTap" || name == "tap")
     return std::make_unique<OnTapExpression>();
-  if (name == "relative")
-    return std::make_unique<RelativeExpression>();
+  if (name == "toRelative" || name == "relative")
+    return std::make_unique<ToRelativeExpression>();
+  if (name == "relativeToSpeed")
+    return std::make_unique<RelativeToSpeedExpression>();
   if (name == "smooth")
     return std::make_unique<SmoothExpression>();
   if (name == "pulse")

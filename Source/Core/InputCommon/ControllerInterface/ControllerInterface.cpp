@@ -43,6 +43,7 @@ ControllerInterface g_controller_interface;
 // but UI can read from the main thread. This will never interfere with game threads.
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
+static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
 
 void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 {
@@ -296,14 +297,18 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
 }
 
 // Update input for all devices if lock can be acquired without waiting.
-void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double delta_seconds)
+void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
+                                      double target_delta_seconds)
 {
   // We set the read/write input channel here, see Device::RelativeInput for more info.
   // The other information is used by FunctionExpression(s) to determine their timings.
   // Inputs for this channel will be read immediately after this call.
   // Make sure to not read them after the input channel has changed again (on the same thread).
   tls_input_channel = input_channel;
+  // Delta seconds can be bigger or smaller than the target one, but they should average out
   s_input_channels_delta_seconds[u8(tls_input_channel)] = delta_seconds;
+  s_input_channels_target_delta_seconds[u8(tls_input_channel)] =
+      target_delta_seconds > 0.f ? target_delta_seconds : delta_seconds;
 
   // Prefer outdated values over blocking UI or CPU thread (avoids short but noticeable frame drop)
   if (m_devices_mutex.try_lock())
@@ -324,6 +329,7 @@ void ControllerInterface::Reset(ciface::InputChannel input_channel)
   if (!m_is_init)
     return;
 
+  // No need to clean s_input_channels_delta_seconds
   tls_input_channel = input_channel;
 
   std::lock_guard lk(m_devices_mutex);
@@ -385,6 +391,11 @@ void ControllerInterface::InvokeDevicesChangedCallbacks() const
 ciface::InputChannel ControllerInterface::GetCurrentInputChannel()
 {
   return tls_input_channel;
+}
+
+double ControllerInterface::GetTargetInputDeltaSeconds()
+{
+  return s_input_channels_target_delta_seconds[u8(tls_input_channel)];
 }
 
 double ControllerInterface::GetCurrentInputDeltaSeconds()

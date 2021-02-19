@@ -53,7 +53,8 @@ public:
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
   void PlatformPopulateDevices(std::function<void()> callback);
   bool IsInit() const { return m_is_init; }
-  void UpdateInput(ciface::InputChannel input_channel, double delta_seconds);
+  void UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
+                   double target_delta_seconds = 0.0);
   void Reset(ciface::InputChannel input_channel);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
@@ -69,6 +70,7 @@ public:
   void InvokeDevicesChangedCallbacks() const;
 
   static ciface::InputChannel GetCurrentInputChannel();
+  static double GetTargetInputDeltaSeconds();
   static double GetCurrentInputDeltaSeconds();
 
 private:
