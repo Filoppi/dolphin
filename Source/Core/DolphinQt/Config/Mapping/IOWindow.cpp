@@ -371,7 +371,8 @@ void IOWindow::CreateMainLayout()
     AddFunction("onTap");
     AddFunction("cache");
     AddFunction("toggle");
-    AddFunction("relative");
+    AddFunction("toRelative");
+    AddFunction("relativeToSpeed");
     AddFunction("smooth");
     AddFunction("pulse");
     AddFunction("timer");
@@ -556,7 +557,7 @@ void IOWindow::AddFunction(std::string function_name)
     }
 
     // Arguments won't be translated, just like function names
-    func_tooltip = tr("Arguments: (%1)").arg(QString::fromStdString(correct_args));
+    func_tooltip = tr("Arguments: %1").arg(QString::fromStdString(correct_args));
     // Truncate if too long
     if (func_tooltip.length() > 72)
     {
