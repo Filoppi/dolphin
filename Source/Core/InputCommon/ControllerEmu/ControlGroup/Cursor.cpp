@@ -104,6 +104,7 @@ Cursor::StateData Cursor::GetState(bool update, float absolute_time_elapsed)
 
   const auto now = Clock::now();
 
+  //To just use ControllerInterface::GetCurrentRealInputDeltaSeconds() if we can, and review the abs time setting...
   const auto ms_since_update =
       std::chrono::duration_cast<milli_with_remainder>(now - m_last_update).count();
   m_last_update = now;

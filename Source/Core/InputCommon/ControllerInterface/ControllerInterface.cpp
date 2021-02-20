@@ -5,6 +5,7 @@
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 #include <algorithm>
+#include <chrono>
 
 #include "Common/Logging/Log.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
@@ -37,6 +38,8 @@
 
 ControllerInterface g_controller_interface;
 
+using Clock = std::chrono::steady_clock;
+
 // We need to save which input channel we are in by thread, so we can access the correct input update values
 // in different threads by input channel.
 // We start from InputChannel::Host on all threads as hotkeys are updated from a worker thread,
@@ -44,6 +47,8 @@ ControllerInterface g_controller_interface;
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
 static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
+static double s_input_channels_real_delta_seconds[u8(ciface::InputChannel::Max)];
+static Clock::time_point s_input_channels_last_update[u8(ciface::InputChannel::Max)];
 
 void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 {
@@ -305,10 +310,21 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
   // Inputs for this channel will be read immediately after this call.
   // Make sure to not read them after the input channel has changed again (on the same thread).
   tls_input_channel = input_channel;
-  // Delta seconds can be bigger or smaller than the target one, but they should average out
+  // This is not the actual world elapsed time, it's the emulation elapsed time
   s_input_channels_delta_seconds[u8(tls_input_channel)] = delta_seconds;
+  // Delta seconds can be bigger or smaller than the target one, but they should average out
   s_input_channels_target_delta_seconds[u8(tls_input_channel)] =
       target_delta_seconds > 0.f ? target_delta_seconds : delta_seconds;
+
+  // Calculate the real/world elapsed time.
+  // Useful to turn relative axes into "rate of change"/speed values usable by games
+  const auto now = Clock::now();
+  Clock::time_point& input_channel_last_update =
+      s_input_channels_last_update[u8(tls_input_channel)];
+  s_input_channels_real_delta_seconds[u8(tls_input_channel)] =
+      std::chrono::duration_cast<std::chrono::duration<double>>(now - input_channel_last_update)
+          .count();
+  input_channel_last_update = now;
 
   // Prefer outdated values over blocking UI or CPU thread (avoids short but noticeable frame drop)
   if (m_devices_mutex.try_lock())
@@ -329,8 +345,10 @@ void ControllerInterface::Reset(ciface::InputChannel input_channel)
   if (!m_is_init)
     return;
 
-  // No need to clean s_input_channels_delta_seconds
+  // No need to clean s_input_channels_delta_seconds and the others
   tls_input_channel = input_channel;
+  //To review: also call this on Init and on Shutdown? Or maybe put Clock::now() in the constructor?
+  s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
 
   std::lock_guard lk(m_devices_mutex);
 
@@ -393,12 +411,17 @@ ciface::InputChannel ControllerInterface::GetCurrentInputChannel()
   return tls_input_channel;
 }
 
+double ControllerInterface::GetCurrentInputDeltaSeconds()
+{
+  return s_input_channels_delta_seconds[u8(tls_input_channel)];
+}
+
 double ControllerInterface::GetTargetInputDeltaSeconds()
 {
   return s_input_channels_target_delta_seconds[u8(tls_input_channel)];
 }
 
-double ControllerInterface::GetCurrentInputDeltaSeconds()
+double ControllerInterface::GetCurrentRealInputDeltaSeconds()
 {
-  return s_input_channels_delta_seconds[u8(tls_input_channel)];
+  return s_input_channels_real_delta_seconds[u8(tls_input_channel)];
 }

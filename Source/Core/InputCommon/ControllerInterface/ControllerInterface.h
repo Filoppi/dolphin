@@ -70,8 +70,9 @@ public:
   void InvokeDevicesChangedCallbacks() const;
 
   static ciface::InputChannel GetCurrentInputChannel();
-  static double GetTargetInputDeltaSeconds();
   static double GetCurrentInputDeltaSeconds();
+  static double GetTargetInputDeltaSeconds();
+  static double GetCurrentRealInputDeltaSeconds();
 
 private:
   std::list<std::function<void()>> m_devices_changed_callbacks;

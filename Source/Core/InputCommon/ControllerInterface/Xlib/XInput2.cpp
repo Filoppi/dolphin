@@ -33,7 +33,7 @@
 
 // Just a default value which works well at 800dpi.
 // Users can multiply it anyway (lower is more sensitive)
-#define MOUSE_AXIS_SENSITIVITY 1000.0
+#define MOUSE_AXIS_SENSITIVITY 17.0
 
 namespace ciface::XInput2
 {

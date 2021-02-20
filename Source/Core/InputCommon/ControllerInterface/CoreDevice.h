@@ -140,19 +140,16 @@ public:
 
 protected:
     InputChannel GetCurrentInputChannel() const;
-    double GetCurrentInputDeltaSeconds() const;
   };
 
   //
   // RelativeInput
   //
   // Helper to generate a relative input from an absolute one.
-  // Keeps the last 2 absolute states and returns their difference, divided by the time delta.
+  // Keeps the last 2 absolute states and returns their difference.
   // It has one state per input channel, as otherwise one SetState() would break
-  // GetState() on the other channels. 
-  // For example the SerialInterface updates inputs at irregular intervals, so to get consistent
-  // results, we need to consider the elapsed time (which also helps keeping in keeping
-  // the values similar between different channels).
+  // GetState() on the other channels.
+  // This is not directly mappable to analog sticks, there are function expressions for that.
   // You don't have to use this implementation.
   //
   template <typename T = ControlState>
@@ -166,14 +163,6 @@ protected:
       RelativeInputState& state = m_states[u8(GetCurrentInputChannel())];
       state.relative_state =
           state.initialized ? ControlState(absolute_state - state.absolute_state) : 0.0;
-      //To review: should we multiply this by the "expected delta time" and also the emulation speed?
-      //The value in the input mappings UI will be wrong/different from what they will be in the game
-      //when the game is not running because the refresh rate is different (same for every input channel, they will have a different "speed").
-      //Unfortunately while it's possible to guess what the "expected delta time" of the SerialInterface would be, we can't accurately know it, nor we can before the game actually starts.
-      //If we multiply by emulation speed, it might break the relative wiimote cursor,
-      //if we don't, analog sticks mapped to this will require different mouse movements at different games speeds,
-      //though users can always multiply the input in the control expression themselves.
-      state.relative_state /= GetCurrentInputDeltaSeconds();
       state.absolute_state = absolute_state;
       state.initialized = true;
     }
