@@ -147,7 +147,7 @@ void Device::Output::SetState(ControlState state, const void* source_object)
   else
     states[source_object] = state;  // Add or update the value
 
-  //To test
+  //To test (and do with a normal for loop because it's C++20)
   // Find the sum and only set it if is changed.
   // We assume the sum is always what we want, if not, we could have different settings.
   const ControlState final_state =
