@@ -291,6 +291,8 @@ void IOWindow::CreateMainLayout()
   else
   {
     m_parse_text = new InputStateLineEdit([this] {
+      // Note that ControlReference values are cached upfront, so they might look
+      // different from the values in the inputs list
       if (m_reference->IsInput())
         return m_reference->GetState<ControlState>();
       return 0.0;
@@ -331,15 +333,13 @@ void IOWindow::CreateMainLayout()
   m_functions_combo->addItem(tr("Functions"));
   m_functions_combo->setToolTip(
       tr("Most functions take arguments (arg): you can either put a control there,\na constant "
-         "number or any other function.\n"
-         "[arg] means that it's optional and can be not inserted.\n\"arg = x\" means that it will "
+         "number or any other function.\n[arg] means that it's optional and can be not "
+         "inserted.\n\"arg = x\" means that it will "
          "default to that value if you don't specify it.\n\"...\" means unlimited args are "
          "supported.\n\nWhen functions ask for a number of frames, they are usually input update "
-         "frames,\n"
-         "which differ from game frames (they change from game to game).\nDon't try to mix input "
-         "and output functions and expect "
-         "them work.\nTheir state is updated even when emulation is not running and "
-         "will carry over."));
+         "frames,\nwhich differ from video frames (the video refresh rate, not the game "
+         "FPS).\nDon't try to mix input and output functions and expect them work.\nTheir state is "
+         "updated even when emulation is not running and will carry over"));
   // This might cause an empty unselectable whitespace at the end of the ComboBox selection
   m_functions_combo->insertSeparator(m_functions_combo->count());  // A separator is also an item
   m_functions_parameters.push_back(QStringLiteral(""));            // Keep the indexes aligned
@@ -397,7 +397,7 @@ void IOWindow::CreateMainLayout()
     // Meta/Focus:
     AddFunction("gameSpeed");
     AddFunction("timeToInputFrames");
-    AddFunction("gameToInputFrames");
+    AddFunction("videoToInputFrames");
     AddFunction("hasFocus");
     // These functions can't be used on input settings (they would just be ignored)
     if (m_type == Type::Input)
@@ -634,6 +634,7 @@ void IOWindow::ConnectWidgets()
   connect(m_option_list, &QTableWidget::itemSelectionChanged,
           [this] { m_select_button->setEnabled(m_option_list->currentRow() >= 0); });
   
+  //To explain that some axes are relative?
   connect(m_help_button, &QPushButton::clicked, [this] {
     QString help_tooltip =
         tr("You can either simply bind an %1 or use functions\nand operators to achieve more "

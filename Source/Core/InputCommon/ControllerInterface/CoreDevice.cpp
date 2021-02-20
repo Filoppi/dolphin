@@ -495,9 +495,4 @@ InputChannel Device::Input::GetCurrentInputChannel() const
 {
   return ControllerInterface::GetCurrentInputChannel();
 }
-
-double Device::Input::GetCurrentInputDeltaSeconds() const
-{
-  return ControllerInterface::GetCurrentInputDeltaSeconds();
-}
 }  // namespace ciface::Core

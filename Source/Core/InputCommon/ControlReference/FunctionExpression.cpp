@@ -1252,6 +1252,12 @@ private:
 };
 
 // usage: relativeToSpeed(input)
+// Input polling is not done at irregular intervals, both in real/world time,
+// and in emulation time (irregular only on the SI).
+// Meaning that relative axis movement would be vastly different between input frames,
+// so we need to normalize it.
+// Note that sometimes 2 input updates are so close to each other that relative axes
+// might not have had time to move precisely, so our output won't be linear with their speed.
 class RelativeToSpeedExpression : public FunctionExpression
 {
 private:
@@ -1272,8 +1278,17 @@ private:
 
   ControlState GetValue() const override
   {
-    //To review: multiply by "ControllerInterface::GetInputDeltaSeconds() / ControllerInterface::GetTargetInputDeltaSeconds()"?
-    return GetArg(0).GetValue() * ControllerInterface::GetTargetInputDeltaSeconds();
+    //To review: values are NOT consistent (they swing a lot) (ControllerInterface::GetCurrentInputDeltaSeconds()?).
+    //Also simplify to 1 line. Values seem to be more consistent if the emu speed is 20% so maybe the code is correct. Though there are some spikes.
+    //Values don't seem to be 100% consistent between Wii and GC, they are slightly higher on GC?
+    ControlState base_value = GetArg(0).GetValue();
+    // This basically normalized the updates by:
+    // -the video refresh rate (50 or 60)
+    // -the emulation speed
+    // -the real time oscillations between input polling
+    base_value *= ControllerInterface::GetTargetInputDeltaSeconds() /
+                  ControllerInterface::GetCurrentRealInputDeltaSeconds();
+    return base_value;
   }
 };
 
@@ -1443,7 +1458,7 @@ private:
   {
     // This will return 1 when the emulation is not running, wether in the UI or not
     return 1.0;
-    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic)
+    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic). Maybe we don't need this anymore...
   }
 };
 
@@ -1473,8 +1488,8 @@ private:
   }
 };
 
-// usage: gameToInputFrames(frames)
-class GameToInputFramesExpression : public FunctionExpression
+// usage: videoToInputFrames(frames)
+class VideoToInputFramesExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
@@ -1489,11 +1504,11 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans(
-        "Input isn't updated at the same frequency as the game video,\nso some functions ask "
+        "Input isn't updated with the same frequency as the video,\nso some functions ask "
         "for a duration in input frames.\nUse this to convert to it as not all input frames are\n"
-        "guaranteed to be read by the game.\nThe actual game frame rate won't influence this.\nYou "
-        "can't preview  values when the emulation is not running.\n"
-        "Ignored for non game mappings");
+        "guaranteed to be read by the game.\nThe actual game frame rate won't influence this, only "
+        "the video refresh rate will.\nYou can't preview values when the emulation is not running."
+        "\nIgnored for non game mappings");
   }
 
   ControlState GetValue() const override
@@ -1502,9 +1517,8 @@ private:
          ControllerInterface::GetCurrentInputChannel() != InputChannel::Bluetooth) ||
         ::Core::GetState() == ::Core::State::Uninitialized)
       return GetArg(0).GetValue();
-    // GetTargetRefreshRate() is double of the actual video frame rate
     return GetArg(0).GetValue() * (ControllerInterface::GetTargetInputDeltaSeconds() *
-                                   (VideoInterface::GetTargetRefreshRate() * 0.5));
+                                   VideoInterface::GetTargetRefreshRate());
   }
 };
 
@@ -1647,8 +1661,8 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<GameSpeedExpression>();
   if (name == "timeToInputFrames")
     return std::make_unique<TimeToInputFramesExpression>();
-  if (name == "gameToInputFrames")
-    return std::make_unique<GameToInputFramesExpression>();
+  if (name == "videoToInputFrames")
+    return std::make_unique<VideoToInputFramesExpression>();
   if (name == "hasFocus")
     return std::make_unique<HasFocusExpression>();
   if (name == "ignoreFocus")

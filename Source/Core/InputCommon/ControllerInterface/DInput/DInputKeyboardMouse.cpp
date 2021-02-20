@@ -10,9 +10,9 @@
 #include "InputCommon/ControllerInterface/DInput/DInput.h"
 #include "InputCommon/ControllerInterface/DInput/DInputKeyboardMouse.h"
 
-// Just a default value which works well at default at 800dpi.
+// Just a default value which works well at 800dpi.
 // Users can multiply it anyway (lower is more sensitive)
-#define MOUSE_AXIS_SENSITIVITY 1000
+#define MOUSE_AXIS_SENSITIVITY 17
 
 namespace ciface::DInput
 {

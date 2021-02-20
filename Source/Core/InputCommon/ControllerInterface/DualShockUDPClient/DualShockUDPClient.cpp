@@ -54,7 +54,7 @@ s16 g_calibration_touch_y_max = std::numeric_limits<s16>::min();
 // Numbers found by attempt on DS4 (couldn't be found in DS4Windows source as they are passed
 // through from the DS4 directly). Given that the DSU protocol offers no max for touch, we assume
 // other implementation that are not DS4 should follow the same min and max as DS4.
-constexpr ControlState TOUCH_SPEED = 0.0125;  // Just a value that seemed good //To do: multiply by 60
+constexpr ControlState TOUCH_SPEED = 0.0125;  // Just a value that seemed good
 
 class Device final : public Core::Device
 {

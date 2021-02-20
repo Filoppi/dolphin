@@ -880,9 +880,9 @@ void Update(u64 ticks)
     delta_time = std::min(delta_time, 1.0 / VideoInterface::GetTargetRefreshRate());
     s_prev_si_poll_ticks = CoreTiming::GetTicks();
 
-    // Input delta time will average itself out every two frames.
+    // Input delta time will average itself to the video refresh rate every two updates.
     // Ignore cases where s_prev_si_poll_delta_time might be 0 or "wrong" as it likely won't matter.
-    SerialInterface::UpdateDevices(delta_time, delta_time + s_prev_si_poll_delta_time);
+    SerialInterface::UpdateDevices(delta_time, (delta_time + s_prev_si_poll_delta_time) / 2.0);
     s_prev_si_poll_delta_time = delta_time;
 
     s_half_line_of_next_si_poll += 2 * SerialInterface::GetPollXLines();
