@@ -27,25 +27,13 @@
 // *    Mouse cursor controls: one for each cardinal direction. Calculated by
 //      comparing the absolute position of the mouse pointer on screen to the
 //      center of the emulator window.
-// *    Mouse axis controls: one for each cardinal direction. Calculated using
-//      a running average of relative mouse motion on each axis.
+// *    Mouse axis controls: one for each cardinal direction.
 // *    Key controls: these correspond to a limited subset of the keyboard
 //      keys.
 
-// Mouse axis control tuning. Unlike absolute mouse position, relative mouse
-// motion data needs to be tweaked and smoothed out a bit to be usable.
-
-// just a default value which works well at default. Users can multiply it anyway
-// (lower is more sensitive)
-#define MOUSE_AXIS_SENSITIVITY 1000.0f
-
-// The mouse axis controls use a weighted running average. Each frame, the new
-// value is the average of the old value and the amount of relative mouse
-// motion during that frame. The old value is weighted by a ratio of
-// MOUSE_AXIS_SMOOTHING:1 compared to the new value. Increasing
-// MOUSE_AXIS_SMOOTHING makes the controls smoother, decreasing it makes them
-// more responsive. This might be useful as a user-customizable option.
-#define MOUSE_AXIS_SMOOTHING 1.5f
+// Just a default value which works well at 800dpi.
+// Users can multiply it anyway (lower is more sensitive)
+#define MOUSE_AXIS_SENSITIVITY 1000.0
 
 namespace ciface::XInput2
 {
@@ -195,7 +183,14 @@ KeyboardMouse::KeyboardMouse(Window window, int opcode, int pointer, int keyboar
 
   // Mouse Axis, X-/+ and Y-/+
   for (int i = 0; i != 4; ++i)
-    AddInput(new Axis(!!(i & 2), !!(i & 1), (i & 2) ? &m_state.axis.y : &m_state.axis.x));
+  {
+    const bool positive = !!(i & 1);
+    const ControlState scale = 1.0 / (positive ? MOUSE_AXIS_SENSITIVITY : -MOUSE_AXIS_SENSITIVITY);
+    const u8 index = !!(i & 2);
+    Axis* axis = new Axis(scale, index);
+    m_mouse_axes.push_back(axis);
+    AddInput();
+  }
 }
 
 KeyboardMouse::~KeyboardMouse()
@@ -234,9 +229,6 @@ void KeyboardMouse::UpdateInput()
 {
   XFlush(m_display);
 
-  // for the axis controls
-  float delta_x = 0.0f, delta_y = 0.0f;
-  double delta_delta;
   bool mouse_moved = false;
 
   // Iterate through the event queue - update the axis controls, mouse
@@ -279,17 +271,17 @@ void KeyboardMouse::UpdateInput()
       // then the value in raw_values is also available.
       if (XIMaskIsSet(raw_event->valuators.mask, 0))
       {
-        delta_delta = raw_event->raw_values[0];
+        const double delta_delta = raw_event->raw_values[0];
         // test for inf and nan
         if (delta_delta == delta_delta && 1 + delta_delta != delta_delta)
-          delta_x += delta_delta;
+          m_state.axis.x += delta_delta;
       }
       if (XIMaskIsSet(raw_event->valuators.mask, 1))
       {
-        delta_delta = raw_event->raw_values[1];
+        const double delta_delta = raw_event->raw_values[1];
         // test for inf and nan
         if (delta_delta == delta_delta && 1 + delta_delta != delta_delta)
-          delta_y += delta_delta;
+          m_state.axis.y += delta_delta;
       }
       break;
     case XI_FocusOut:
@@ -301,13 +293,11 @@ void KeyboardMouse::UpdateInput()
     XFreeEventData(m_display, &event.xcookie);
   }
 
-  // apply axis smoothing
-  m_state.axis.x *= MOUSE_AXIS_SMOOTHING;
-  m_state.axis.x += delta_x;
-  m_state.axis.x /= MOUSE_AXIS_SMOOTHING + 1.0f;
-  m_state.axis.y *= MOUSE_AXIS_SMOOTHING;
-  m_state.axis.y += delta_y;
-  m_state.axis.y /= MOUSE_AXIS_SMOOTHING + 1.0f;
+  for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
+  {
+    const double& axis = (&m_state.axis.x)[i / 2];
+    m_mouse_axes[i]->UpdateState(axis);
+  }
 
   // Get the absolute position of the mouse pointer
   if (mouse_moved)
@@ -384,14 +374,9 @@ ControlState KeyboardMouse::Cursor::GetState() const
   return std::max(0.0f, *m_cursor / (m_positive ? 1.0f : -1.0f));
 }
 
-KeyboardMouse::Axis::Axis(u8 index, bool positive, const float* axis)
-    : m_axis(axis), m_index(index), m_positive(positive)
+KeyboardMouse::Axis::Axis(ControlState scale, u8 index)
+    : RelativeInput(scale), m_index(index){}
 {
-  name = fmt::format("Axis {}{}", static_cast<char>('X' + m_index), (m_positive ? '+' : '-'));
-}
-
-ControlState KeyboardMouse::Axis::GetState() const
-{
-  return std::max(0.0f, *m_axis / (m_positive ? MOUSE_AXIS_SENSITIVITY : -MOUSE_AXIS_SENSITIVITY));
+  name = fmt::format("Axis {}{}", static_cast<char>('X' + m_index), (m_scale >= 0.0 ? '+' : '-'));
 }
 }  // namespace ciface::XInput2

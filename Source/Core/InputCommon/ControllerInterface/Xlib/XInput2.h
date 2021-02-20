@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 extern "C" {
 #include <X11/Xlib.h>
@@ -29,7 +30,7 @@ private:
     std::array<char, 32> keyboard;
     unsigned int buttons;
     Common::Vec2 cursor;
-    Common::Vec2 axis;
+    Common::DVec2 axis;
   };
 
   class Key : public Input
@@ -85,12 +86,11 @@ private:
     std::string name;
   };
 
-  // TODO: copy new implementation from DInputKeyboardMouse.cpp
-  class Axis : public Input
+  class Axis : public RelativeInput<double>
   {
   public:
     std::string GetName() const override { return name; }
-    Axis(u8 index, bool positive, const float* axis);
+    Axis(ControlState scale, u8 index);
     ControlState GetState() const override;
     FocusFlags GetFocusFlags() const override
     {
@@ -98,9 +98,7 @@ private:
     }
 
   private:
-    const float* m_axis;
     const u8 m_index;
-    const bool m_positive;
     std::string name;
   };
 
@@ -121,6 +119,7 @@ private:
   Window m_window;
   Display* m_display;
   State m_state{};
+  std::vector<Axis*> m_mouse_axes;
   const int xi_opcode;
   const int pointer_deviceid;
   const int keyboard_deviceid;
