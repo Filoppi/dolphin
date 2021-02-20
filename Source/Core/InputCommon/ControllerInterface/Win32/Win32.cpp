@@ -21,7 +21,7 @@ constexpr UINT WM_DOLPHIN_STOP = WM_USER;
 
 static Common::Event s_done_populating;
 static std::atomic<HWND> s_hwnd;  // Dolphin's render window
-static HWND s_message_window;  // Windows messaging window (hidden)
+static HWND s_message_window;     // Windows messaging window (hidden)
 static std::thread s_thread;
 static std::atomic<bool> s_first_pupulate_devices_asked;
 
