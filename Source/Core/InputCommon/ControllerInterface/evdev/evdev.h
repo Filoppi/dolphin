@@ -24,7 +24,7 @@ private:
   public:
     Effect(int fd);
     ~Effect();
-    void SetState(ControlState state) override;
+    void SetStateInternal(ControlState state) override;
 
   protected:
     virtual bool UpdateParameters(ControlState state) = 0;

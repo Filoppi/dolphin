@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "Common/CommonTypes.h"
+
 namespace ciface
 {
 // Assumed to be u8
