@@ -8,8 +8,8 @@
 #include "Common/Common.h"
 #include "Common/MathUtil.h"
 #include "Core/Core.h"
-#include "Core/Host.h"
 #include "Core/HW/VideoInterface.h"
+#include "Core/Host.h"
 
 #include <algorithm>
 #include <chrono>
@@ -358,7 +358,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Will start playing back the specified sequence (frame by frame)\nevery time the "
+    return _trans("Will start playing back the specified sequence (frame by frame) every time the "
                   "input is pressed");
   }
 
@@ -412,8 +412,8 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("It will record \"input\" while \"record_input\" is held down,\nand "
-                  "playback when \"playback_input\" is pressed.\n\"input\" is passed through "
+    return _trans("It will record \"input\" while \"record_input\" is held down, and "
+                  "playback when \"playback_input\" is pressed. \"input\" is passed through "
                   "otherwise. Recordings are not saved");
   }
 
@@ -489,7 +489,7 @@ private:
   {
     const ControlState input = GetArg(0).GetValue();
     const size_t lag_frames = size_t(std::max(GetArg(1).GetValue() + 0.5, 0.0));
-    
+
     m_cached_states.reserve(lag_frames + 1);
 
     while (m_cached_states.size() < lag_frames)
@@ -572,7 +572,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Returns the sum of the input over the specified number of frames.\nUse "
+    return _trans("Returns the sum of the input over the specified number of frames. Use "
                   "this on relative inputs to avoid losing values not read by the game");
   }
 
@@ -689,7 +689,7 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans("Goes against a game built in deadzone, like if it will treat 0.2 (amount) as "
-                  "0,\nbut will treat 0.3 as 0.125. It should be applied after deadzone");
+                  "0, but will treat 0.3 as 0.125. It should be applied after deadzone");
   }
 
   ControlState GetValue() const override
@@ -721,11 +721,10 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans(
-        "2 control points bezier.\nBasically just a fancy \"remap\"in one dimension.\n"
-        "Useful to go against games analog stick response curve\nwhen using the"
-        "mouse as as axis, or when games have\na linear response curve to an analog stick"
-        "\nand you'd like to change it.\nMostly used on the x axis (left/right)");
+    return _trans("2 control points bezier. Basically just a fancy \"remap\"in one dimension. "
+                  "Useful to go against games analog stick response curve when using the"
+                  "mouse as as axis, or when games have a linear response curve to an analog stick"
+                  " and you'd like to change it. Mostly used on the x axis (left/right)");
   }
 
   ControlState GetValue() const override
@@ -771,8 +770,8 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans(
-        "Useful when using the mouse as an axis and you don't want\nthe game to gradually "
-        "accelerate its response with time.\nIt should help in keeping a response curve closer to "
+        "Useful when using the mouse as an axis and you don't want the game to gradually "
+        "accelerate its response with time. It should help in keeping a response curve closer to "
         "1:1 (linear)");
   }
 
@@ -831,7 +830,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Gradually moves its internal value toward its target value (input).\nIt asks to "
+    return _trans("Gradually moves its internal value toward its target value (input). It asks to "
                   "specify the times to go between 0 and 1");
   }
 
@@ -875,10 +874,7 @@ private:
       return ExpectedArguments{"input, [clear]"};
   }
 
-  const char* GetDescription(bool for_input) const override
-  {
-    return _trans("Toggle on press");
-  }
+  const char* GetDescription(bool for_input) const override { return _trans("Toggle on press"); }
 
   ControlState GetValue() const override
   {
@@ -1006,7 +1002,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return "Returns 1 when the input detection threshold has changed from the previous value,\nfor "
+    return "Returns 1 when the input detection threshold has changed from the previous value, for "
            "the specified number of frames";
   }
 
@@ -1050,7 +1046,7 @@ private:
   {
     if (for_input)
     {
-      return _trans("Caches and returns the input when the condition is true,\nreturns the "
+      return _trans("Caches and returns the input when the condition is true, returns the "
                     "cached value when the condition is false");
     }
     return _trans("Sets and caches the value when the condition is true, keeps settings the cached "
@@ -1124,7 +1120,8 @@ private:
   }
 
   mutable bool m_state = false;
-  mutable Clock::time_point m_start_time = Clock::now();};
+  mutable Clock::time_point m_start_time = Clock::now();
+};
 
 // usage: onTap(input, seconds, taps = 2)
 // Use real world time for this one as it makes more sense
@@ -1142,7 +1139,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Double+ tap detection within the specified time.\nKeeps returning 1 until you "
+    return _trans("Double+ tap detection within the specified time. Keeps returning 1 until you "
                   "release the last tap");
   }
 
@@ -1241,7 +1238,7 @@ private:
 
     m_state += std::min(std::max(max_move, -diff_from_zero), diff_from_max) *
                std::copysign(1.0, max_abs_value);
-    
+
     if (GetArgCount() >= 4)
       const_cast<Expression&>(GetArg(3)).SetValue(m_state);
 
@@ -1272,7 +1269,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Turns a relative axis into a rate of change (speed).\nCan be used to map a "
+    return _trans("Turns a relative axis into a rate of change (speed). Can be used to map a "
                   "mouse axis to an analog stick for example");
   }
 
@@ -1419,7 +1416,7 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Forces focus to be checked on the expression.\nThis is mostly needed for "
+    return _trans("Forces focus to be checked on the expression. This is mostly needed for "
                   "outputs which ignore focus by default");
   }
 
@@ -1477,8 +1474,8 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("If you don't want to deal with input update calculations you can use\n"
-                  "this function to convert seconds to input frames.\nYou can't preview "
+    return _trans("If you don't want to deal with input update calculations you can use "
+                  "this function to convert seconds to input frames. You can't preview "
                   "values when the emulation is not running");
   }
 
@@ -1504,11 +1501,11 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans(
-        "Input isn't updated with the same frequency as the video,\nso some functions ask "
-        "for a duration in input frames.\nUse this to convert to it as not all input frames are\n"
-        "guaranteed to be read by the game.\nThe actual game frame rate won't influence this, only "
-        "the video refresh rate will.\nYou can't preview values when the emulation is not running."
-        "\nIgnored for non game mappings");
+        "Input isn't updated with the same frequency as the video, so some functions ask "
+        "for a duration in input frames. Use this to convert to it as not all input frames are "
+        "guaranteed to be read by the game. The actual game frame rate won't influence this, only "
+        "the video refresh rate will. You can't preview values when the emulation is not running."
+        " Ignored for non game mappings");
   }
 
   ControlState GetValue() const override
@@ -1539,7 +1536,7 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans("Can be used to cache inputs values on focus loss, or to trigger inputs the "
-                  "window loses focus,\nlike pausing "
+                  "window loses focus, like pausing "
                   "the game pause or changing the emulation speed");
   }
 
