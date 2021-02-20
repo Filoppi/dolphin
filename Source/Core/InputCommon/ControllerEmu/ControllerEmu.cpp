@@ -4,11 +4,6 @@
 
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 
-#include <memory>
-#include <mutex>
-#include <string>
-
-#include "Common/IniFile.h"
 #include "Common/Logging/Log.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
