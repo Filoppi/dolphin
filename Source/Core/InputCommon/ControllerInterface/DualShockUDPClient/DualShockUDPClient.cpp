@@ -51,10 +51,11 @@ s16 g_calibration_touch_y_min = std::numeric_limits<s16>::max();
 s16 g_calibration_touch_x_max = std::numeric_limits<s16>::min();
 s16 g_calibration_touch_y_max = std::numeric_limits<s16>::min();
 
+//To review this comment
 // Numbers found by attempt on DS4 (couldn't be found in DS4Windows source as they are passed
 // through from the DS4 directly). Given that the DSU protocol offers no max for touch, we assume
 // other implementation that are not DS4 should follow the same min and max as DS4.
-constexpr ControlState TOUCH_SPEED = 0.0125;  // Just a value that seemed good
+constexpr ControlState TOUCH_SPEED = 0.0125;  // Just a value that seemed good //To remove all of these and just return the 1:1 offset?
 
 class Device final : public Core::Device
 {
@@ -75,7 +76,7 @@ private:
     const T& m_buttons;
     const T m_mask;
   };
-  
+
   template <class T = ControlState>
   class AnalogInput : public Input
   {
@@ -100,10 +101,10 @@ private:
 
   private:
     const char* m_name;
-    const std::string_view m_old_name;
     const T& m_input;
     const ControlState m_range;
     const ControlState m_offset;
+    const std::string_view m_old_name;
   };
 
   class RelativeTouchInput final : public RelativeInput<s16>
