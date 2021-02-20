@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <mutex>
@@ -15,6 +16,7 @@
 #include "Common/Common.h"
 #include "Common/IniFile.h"
 #include "Common/MathUtil.h"
+
 #include "InputCommon/ControlReference/ExpressionParser.h"
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
