@@ -96,6 +96,33 @@ QTextCharFormat GetCommentCharFormat()
   format.setForeground(QBrush{Qt::darkGray});
   return format;
 }
+
+// Only works if there is at least one empty space per length.
+// Might be useful to have somewhere generic but we don't have such class.
+QString SplitTooltip(QString text, int length)
+{
+  QString result;
+  for (;;)
+  {
+    int i = 0;
+    while (i < text.length())
+    {
+      if (text.left(++i + 1).length() > length)
+      {
+        int j = text.lastIndexOf(QLatin1Char{' '}, i);
+        if (j > 0)
+          i = j;
+        result.append(text.left(i));
+        result.append(QLatin1Char{'\n'});
+        text = text.mid(i + 1);
+        break;
+      }
+    }
+    if (i >= text.length())
+      break;
+  }
+  return result + text;
+}
 }  // namespace
 
 ControlExpressionSyntaxHighlighter::ControlExpressionSyntaxHighlighter(QTextDocument* parent)
@@ -558,11 +585,6 @@ void IOWindow::AddFunction(std::string function_name)
 
     // Arguments won't be translated, just like function names
     func_tooltip = tr("Arguments: %1").arg(QString::fromStdString(correct_args));
-    // Truncate if too long
-    if (func_tooltip.length() > 72)
-    {
-      func_tooltip.insert(72, QStringLiteral("\n"));
-    }
     m_functions_parameters.push_back(QString::fromStdString(commas));
   }
   // Note that there might still be some optional arguments in this case,
@@ -578,7 +600,7 @@ void IOWindow::AddFunction(std::string function_name)
     func_tooltip.append(QStringLiteral("\n%1").arg(tr(description)));
   }
 
-  m_functions_combo->setItemData(m_functions_combo->count() - 1, func_tooltip,
+  m_functions_combo->setItemData(m_functions_combo->count() - 1, SplitTooltip(func_tooltip, 72),
                                  Qt::ToolTipRole);
 }
 

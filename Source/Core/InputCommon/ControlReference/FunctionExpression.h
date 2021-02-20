@@ -42,7 +42,7 @@ public:
   
   ArgumentValidation SetArguments(std::vector<std::unique_ptr<Expression>>&& args);
 
-  // These will be shown in the UI so it's your responsability to add "\n" and wrap them in _trans()
+  // These will be shown in the UI so wrap them in _trans(). Automatically word wrapped.
   virtual const char* GetDescription(bool for_input) const { return nullptr; };
 
   void SetValue(ControlState value) override;
