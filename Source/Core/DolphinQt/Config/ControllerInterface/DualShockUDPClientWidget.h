@@ -17,10 +17,6 @@ class DualShockUDPClientWidget final : public QWidget
 public:
   explicit DualShockUDPClientWidget();
 
-signals:
-  // Emitted when config has changed so widgets can update to reflect the change.
-  void ConfigChanged();
-
 private:
   void CreateWidgets();
   void ConnectWidgets();
