@@ -115,8 +115,6 @@ void DualShockUDPClientWidget::RefreshServerList()
   }
 
   OnServerSelectionChanged();
-
-  emit ConfigChanged();
 }
 
 void DualShockUDPClientWidget::OnServerAdded()
