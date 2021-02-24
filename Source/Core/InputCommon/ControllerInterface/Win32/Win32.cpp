@@ -29,7 +29,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARA
 {
   if (message == WM_INPUT_DEVICE_CHANGE)
   {
-    // Windows automatically sends this message before we are "ready" to listen for it
+    // Windows automatically sends this message before we are "ready" to listen for it.
+    // We can't use ControllerInterface::IsReadyForExternalDevicesPopulation() in this case.
     if (s_first_pupulate_devices_asked)
     {
       g_controller_interface.PlatformPopulateDevices([] {

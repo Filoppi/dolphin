@@ -65,6 +65,11 @@ public:
   // Inputs based on window coordinates should be multiplied by this.
   Common::Vec2 GetWindowInputScale() const;
 
+  bool IsReadyForExternalDevicesPopulation() const
+  {
+    return m_is_ready_for_external_devices_population;
+  }
+
   HotplugCallbackHandle RegisterDevicesChangedCallback(std::function<void(void)> callback);
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
@@ -79,6 +84,7 @@ private:
   mutable std::mutex m_callbacks_mutex;
   std::atomic<bool> m_is_init;
   std::atomic<int> m_is_populating_devices;
+  std::atomic<int> m_is_ready_for_external_devices_population;
   WindowSystemInfo m_wsi;
   std::atomic<float> m_aspect_ratio_adjustment = 1.f;
 };
