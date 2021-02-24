@@ -163,6 +163,11 @@ void ControllerInterface::RefreshDevices()
     InvokeDevicesChangedCallbacks();
   //To review: do before or after? Also with the check, could it never be called?
   m_is_populating_devices.fetch_sub(1);
+
+  // Before we have reached this point for the first time, we don't want any "add/remove devices" calls.
+  // It's 100% safe because we call all PopulateDevices() directly oursevels, and every type of
+  // devices group will try to re-add itself if it failed.
+  m_is_ready_for_external_devices_population = true;
 }
 
 void ControllerInterface::PlatformPopulateDevices(std::function<void()> callback)
@@ -190,6 +195,7 @@ void ControllerInterface::Shutdown()
   // adds devices by constantly locking and unlocking the mutex.
 
   // Prevent additional devices from being added during shutdown.
+  m_is_ready_for_external_devices_population = false;
   m_is_init = false;
   // Additional safety measure to avoid InvokeDevicesChangedCallbacks()
   m_is_populating_devices = 1;
