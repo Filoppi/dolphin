@@ -48,9 +48,12 @@ void DualShockUDPClientAddServerDialog::CreateWidgets()
 
   m_type = new QComboBox();
   m_type->setToolTip(tr(
-      "This will be exclusived used for input names,\nwhich aren't guaranteed to be right for "
+      "This will be exclusived used for input names and default calibration.\nNames aren't "
+      "guaranteed to be right for "
       "non DS4/DualSense controllers\nor if the DSU source uses remapping.\nDifferent DSU profile "
-      "types also won't be compatible with each other"));
+      "types also won't be compatible with each other.\nThis will apply to all devices connected "
+      "from this server, but you can\nstill create the same server twice and use "
+      "different devices for each."));
   m_type->addItem(tr("DualShock 4"), QStringLiteral("DS4"));
   m_type->addItem(tr("DualSense"), QStringLiteral("DualSense"));
   m_type->addItem(tr("Switch"), QStringLiteral("Switch"));
@@ -84,10 +87,22 @@ void DualShockUDPClientAddServerDialog::OnServerAdded()
   // We can't calibrate them now because the input device don't exist yet, it's not connected,
   // so just pass in empty calibration information, users will be able to calibrate themselves,
   // or default calibration will be used.
-  Config::SetBaseOrCurrent(
-      ciface::DualShockUDPClient::Settings::SERVERS,
-      servers_setting + fmt::format("{}:{}:{}:{};", m_description->text().toStdString(),
-                                    m_server_address->text().toStdString(), m_server_port->value(),
-                                    m_type->currentData().toString().toStdString()));
+  const std::string device_type = m_type->currentData().toString().toStdString();
+  if (device_type.empty())
+  {
+    Config::SetBaseOrCurrent(ciface::DualShockUDPClient::Settings::SERVERS,
+                             servers_setting + fmt::format("{}:{}:{};",
+                                                           m_description->text().toStdString(),
+                                                           m_server_address->text().toStdString(),
+                                                           m_server_port->value()));
+  }
+  else
+  {
+    Config::SetBaseOrCurrent(ciface::DualShockUDPClient::Settings::SERVERS,
+                             servers_setting + fmt::format("{}:{}:{}:{};",
+                                                           m_description->text().toStdString(),
+                                                           m_server_address->text().toStdString(),
+                                                           m_server_port->value(), device_type));
+  }
   accept();
 }

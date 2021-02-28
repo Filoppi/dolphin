@@ -30,7 +30,7 @@ namespace ControllerEmu
 {
 class ControlGroup;
 
-// This is generic and could be moved outside
+// This is generic so could be moved outside, but it's only to try and catch problem while debugging
 struct RecursiveMutexCountedLockGuard
 {
   RecursiveMutexCountedLockGuard(std::recursive_mutex* mutex, std::atomic<int>* count)
@@ -278,6 +278,6 @@ protected:
 
 private:
   ciface::Core::DeviceQualifier m_default_device;
-  bool m_default_device_is_connected{false};
+  std::atomic<bool> m_default_device_is_connected{false};
 };
 }  // namespace ControllerEmu

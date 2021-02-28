@@ -46,13 +46,18 @@ public:
 
   ControllerInterface() : m_is_init(false) {}
   void Initialize(const WindowSystemInfo& wsi);
-  void ChangeWindow(void* hwnd);
+  void ChangeWindow(void* hwnd, bool is_exit = false);
   void RefreshDevices();
   void Shutdown();
   void AddDevice(std::shared_ptr<ciface::Core::Device> device);
+  // Removes all the devices the function returns true to
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
+  // This is mandatory to use on device populations functions that can be called cuncurrently by
+  // more than one thread, or that are called by a single other thread.
+  // Without this, our devices list might end up in a mixed state.
   void PlatformPopulateDevices(std::function<void()> callback);
   bool IsInit() const { return m_is_init; }
+
   void UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
                    double target_delta_seconds = 0.0);
   void Reset(ciface::InputChannel input_channel);
@@ -65,11 +70,6 @@ public:
   // Inputs based on window coordinates should be multiplied by this.
   Common::Vec2 GetWindowInputScale() const;
 
-  bool IsReadyForExternalDevicesPopulation() const
-  {
-    return m_is_ready_for_external_devices_population;
-  }
-
   HotplugCallbackHandle RegisterDevicesChangedCallback(std::function<void(void)> callback);
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
@@ -80,11 +80,12 @@ public:
   static double GetCurrentRealInputDeltaSeconds();
 
 private:
+  void ClearDevices();
+
   std::list<std::function<void()>> m_devices_changed_callbacks;
   mutable std::mutex m_callbacks_mutex;
   std::atomic<bool> m_is_init;
   std::atomic<int> m_is_populating_devices;
-  std::atomic<int> m_is_ready_for_external_devices_population;
   WindowSystemInfo m_wsi;
   std::atomic<float> m_aspect_ratio_adjustment = 1.f;
 };

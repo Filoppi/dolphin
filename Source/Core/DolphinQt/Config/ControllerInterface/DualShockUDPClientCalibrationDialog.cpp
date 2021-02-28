@@ -39,9 +39,11 @@ void DualShockUDPClientCalibrationDialog::CreateWidgets()
   m_max_y = new QLabel;
   m_device_state = new QLabel;
 
-  m_main_layout->addWidget(new QLabel(tr("Touch the surface around the top left and the bottom "
-                                         "right\nuntil values don't change anymore.\nDS4 "
-                                         "controllers should already be calibrated.")),
+  m_main_layout->addWidget(
+      new QLabel(tr("Touch the surface around the top left and the bottom "
+                    "right\nuntil values don't change anymore.\nDS4 and DualSense are already "
+                    "calibrated.\nThe same calibration will apply to all the devices\nconnected "
+                    "from this server.")),
       0, 0, 1, 2);
   m_main_layout->addWidget(new QLabel(tr("Min X:")), 1, 0);
   m_main_layout->addWidget(m_min_x, 1, 1);
@@ -83,11 +85,11 @@ void DualShockUDPClientCalibrationDialog::UpdateCalibrationValues()
   // because Dolphin isn't even aware of that, and it's not a problem anyway
   if (ciface::DualShockUDPClient::g_calibration_device_found)
   {
-    bool x_calibration_valid = ciface::DualShockUDPClient::g_calibration_touch_x_max >
-                               ciface::DualShockUDPClient::g_calibration_touch_x_min;
-    bool y_calibration_valid = ciface::DualShockUDPClient::g_calibration_touch_y_max >
-                               ciface::DualShockUDPClient::g_calibration_touch_y_min;
-    bool calibration_valid = x_calibration_valid && y_calibration_valid;
+    const bool x_calibration_valid = ciface::DualShockUDPClient::g_calibration_touch_x_max >
+                                     ciface::DualShockUDPClient::g_calibration_touch_x_min;
+    const bool y_calibration_valid = ciface::DualShockUDPClient::g_calibration_touch_y_max >
+                                     ciface::DualShockUDPClient::g_calibration_touch_y_min;
+    const bool calibration_valid = x_calibration_valid && y_calibration_valid;
     if (x_calibration_valid)
     {
       x_min = QStringLiteral("%1").arg(ciface::DualShockUDPClient::g_calibration_touch_x_min);
@@ -138,10 +140,14 @@ void DualShockUDPClientCalibrationDialog::CommitCalibration()
         if (k == CALIBRATION_INDEX)
         {
           server_info[k] = fmt::format(
-              "({},{},{},{});", m_min_x->text().toStdString(), m_min_y->text().toStdString(),
+              "({},{},{},{})", m_min_x->text().toStdString(), m_min_y->text().toStdString(),
               m_max_x->text().toStdString(), m_max_y->text().toStdString());
         }
-        new_server_info += server_info[k] + ':';
+        new_server_info += server_info[k];
+        if (k + 1 != server_info.size())
+        {
+          new_server_info += ':';
+        }
       }
       server_details[i] = new_server_info;
     }
@@ -150,7 +156,6 @@ void DualShockUDPClientCalibrationDialog::CommitCalibration()
   }
 
   Config::SetBaseOrCurrent(ciface::DualShockUDPClient::Settings::SERVERS, new_server_setting);
-
 
   accept();
 }

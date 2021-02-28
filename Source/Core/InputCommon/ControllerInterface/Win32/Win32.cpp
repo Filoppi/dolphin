@@ -19,7 +19,7 @@
 
 constexpr UINT WM_DOLPHIN_STOP = WM_USER;
 
-static Common::Event s_done_populating;
+static Common::Event s_received_device_change_event;
 static std::atomic<HWND> s_hwnd;  // Dolphin's render window
 static HWND s_message_window;     // Windows messaging window (hidden)
 static std::thread s_thread;
@@ -29,15 +29,14 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARA
 {
   if (message == WM_INPUT_DEVICE_CHANGE)
   {
-    // Windows automatically sends this message before we are "ready" to listen for it.
-    // We can't use ControllerInterface::IsReadyForExternalDevicesPopulation() in this case.
+    // Windows automatically sends this message before we ask for it and "ready" to listen for it.
     if (s_first_pupulate_devices_asked)
     {
+      s_received_device_change_event.Set();
       g_controller_interface.PlatformPopulateDevices([] {
         ciface::DInput::PopulateDevices(s_hwnd);
         ciface::XInput::PopulateDevices();
       });
-      s_done_populating.Set();
     }
   }
 
@@ -131,11 +130,16 @@ void ciface::Win32::PopulateDevices(void* hwnd)
   if (s_thread.joinable())
   {
     s_hwnd = static_cast<HWND>(hwnd);
-    s_done_populating.Reset();
     s_first_pupulate_devices_asked = true;
+    s_received_device_change_event.Reset();
     // Do this forced devices refresh in the messaging thread so it won't cause any race conditions
     PostMessage(s_message_window, WM_INPUT_DEVICE_CHANGE, 0, 0);
-    if (!s_done_populating.WaitFor(std::chrono::seconds(10)))
+    // It's not really the best idea to hang the main thread just to print a log,
+    // we should check later if we have actually received the call.
+    // Note that we might still receive the event after this log has printed.
+    // Note that this could possibly hang the main thread if the messaging thread was already
+    // waiting on the devices mutex.
+    if (!s_received_device_change_event.WaitFor(std::chrono::seconds(3)))
       ERROR_LOG_FMT(CONTROLLERINTERFACE, "win32 timed out when trying to populate devices");
   }
   else
@@ -154,7 +158,7 @@ void ciface::Win32::DeInit()
     s_thread.join();
     s_message_window = nullptr;
     s_hwnd = nullptr;
-    s_done_populating.Reset();
+    s_received_device_change_event.Reset();
     s_first_pupulate_devices_asked = false;
   }
 
