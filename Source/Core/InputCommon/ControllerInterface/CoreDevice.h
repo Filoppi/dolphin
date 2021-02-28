@@ -150,6 +150,7 @@ protected:
   // It has one state per input channel, as otherwise one SetState() would break
   // GetState() on the other channels.
   // This is not directly mappable to analog sticks, there are function expressions for that.
+  // m_scale is useful to automatically scale the input to a usable value by the emulation.
   // You don't have to use this implementation.
   //
   template <typename T = ControlState>
@@ -227,7 +228,7 @@ protected:
 
   private:
     virtual void SetStateInternal(ControlState state) = 0;
-    std::map<const void*, ControlState> states;
+    std::map<const void*, ControlState> m_states;
     ControlState m_final_state = 0;
   };
 
