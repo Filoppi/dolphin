@@ -62,6 +62,9 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 
   m_is_populating_devices = 1;
 
+  // Make sure no hotplugs threads already add devices here
+  m_devices_mutex.lock();
+
 #ifdef CIFACE_USE_WIN32
   ciface::Win32::Init(wsi.render_window);
 #endif
@@ -89,18 +92,26 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
   ciface::DualShockUDPClient::Init();
 #endif
 
-  m_is_populating_devices.fetch_sub(1);
   RefreshDevices();
+
+  m_devices_mutex.unlock();
+
+  if (m_is_populating_devices.fetch_sub(1) == 1 && !m_devices.empty())
+    InvokeDevicesChangedCallbacks();
 }
 
-void ControllerInterface::ChangeWindow(void* hwnd)
+void ControllerInterface::ChangeWindow(void* hwnd, bool is_exit)
 {
   if (!m_is_init)
     return;
 
   // This shouldn't use render_surface so no need to update it.
   m_wsi.render_window = hwnd;
-  RefreshDevices();
+  
+  if (is_exit)  // No need to re-add devices
+    ClearDevices();
+  else  // We could only repupulate devices that depend on the window but it's not that simple
+    RefreshDevices();
 }
 
 void ControllerInterface::RefreshDevices()
@@ -110,24 +121,24 @@ void ControllerInterface::RefreshDevices()
 
   m_is_populating_devices.fetch_add(1);
 
-  {
-    std::lock_guard lk(m_devices_mutex);
-
-    // Set outputs to ZERO before destroying device.
-    // This isn't desirable if the same devices are re-connected but we have no simple solution.
-    for (const auto& d : m_devices)
-      d->ResetOutput();
-
-    m_devices.clear();
-  }
+  // We lock m_devices_mutex here to make everything simpler.
+  // Multiple devices classes have their own "hotplug" thread, and can add/remove devices at any time,
+  // while actual writes to "m_devices" are safe, the order in which they happen is not.
+  // That means a thread could be adding devices while we are removing them, or removing them as we are populating them.
+  // The best way of approaching this (for performance) would be to individually implement this in every devices class,
+  // but it's fairly complicated and this should never hang the emulation thread anyway.
+  m_devices_mutex.lock();
 
   // Make sure shared_ptr<Device> objects are released before repopulating.
-  InvokeDevicesChangedCallbacks();
+  ClearDevices();
+
+  // Some of these calls won't immediately populate devices, but will do it async
+  // with their own PlatformPopulateDevices().
+
+  // TODO: some devices groups, specifically OSX, SDL and evdev, can still
+  // add and remove devices from multiple threads in "unsafe" ways.
 
 #ifdef CIFACE_USE_WIN32
-  // This will call PlatformPopulateDevices() within here.
-  // It's not necessary to call in on Init as PlatformPopulateDevices()
-  // is already called by the Windows input message thread
   ciface::Win32::PopulateDevices(m_wsi.render_window);
 #endif
 #ifdef CIFACE_USE_XLIB
@@ -159,15 +170,10 @@ void ControllerInterface::RefreshDevices()
 
   WiimoteReal::ProcessWiimotePool();
 
-  if (m_is_populating_devices == 1)
-    InvokeDevicesChangedCallbacks();
-  //To review: do before or after? Also with the check, could it never be called?
-  m_is_populating_devices.fetch_sub(1);
+  m_devices_mutex.unlock();
 
-  // Before we have reached this point for the first time, we don't want any "add/remove devices" calls.
-  // It's 100% safe because we call all PopulateDevices() directly oursevels, and every type of
-  // devices group will try to re-add itself if it failed.
-  m_is_ready_for_external_devices_population = true;
+  if (m_is_populating_devices.fetch_sub(1) == 1)
+    InvokeDevicesChangedCallbacks();
 }
 
 void ControllerInterface::PlatformPopulateDevices(std::function<void()> callback)
@@ -177,11 +183,14 @@ void ControllerInterface::PlatformPopulateDevices(std::function<void()> callback
 
   m_is_populating_devices.fetch_add(1);
 
-  callback();
+  {
+    std::lock_guard lk(m_devices_mutex);
 
-  if (m_is_populating_devices == 1)
+    callback();
+  }
+
+  if (m_is_populating_devices.fetch_sub(1) == 1)
     InvokeDevicesChangedCallbacks();
-  m_is_populating_devices.fetch_sub(1);
 }
 
 // Remove all devices and call library cleanup functions
@@ -190,28 +199,13 @@ void ControllerInterface::Shutdown()
   if (!m_is_init)
     return;
 
-  // TODO: fix, this isn't safe, for example, on Windows, we could still be in a
-  // PlatformPopulateDevices() call within another thread, and that removes and
-  // adds devices by constantly locking and unlocking the mutex.
-
   // Prevent additional devices from being added during shutdown.
-  m_is_ready_for_external_devices_population = false;
   m_is_init = false;
   // Additional safety measure to avoid InvokeDevicesChangedCallbacks()
   m_is_populating_devices = 1;
 
-  {
-    std::lock_guard lk(m_devices_mutex);
-
-    for (const auto& d : m_devices)
-      d->ResetOutput();
-
-    m_devices.clear();
-  }
-
-  // This will update control references so shared_ptr<Device>s are freed up
-  // BEFORE we shutdown the backends.
-  InvokeDevicesChangedCallbacks();
+  // Update control references so shared_ptr<Device>s are freed up BEFORE we shutdown the backends.
+  ClearDevices();
 
 #ifdef CIFACE_USE_WIN32
   ciface::Win32::DeInit();
@@ -237,8 +231,30 @@ void ControllerInterface::Shutdown()
 #endif
 
   // Make sure no devices had been added within Shutdown() in the time
-  // between checking the atomic init bool and changing it.
-  assert(m_devices.size() == 0); //To make debug only or log, clean all the other as well
+  // between checking they checked atomic m_is_init bool and we changed it.
+  // We couldn't have locked m_devices_mutex for the whole Shutdown() as it could cause deadlocks.
+  ClearDevices();
+}
+
+void ControllerInterface::ClearDevices()
+{
+  {
+    std::lock_guard lk(m_devices_mutex);
+
+    if (m_devices.empty())
+      return;
+
+    // Set outputs to ZERO before destroying device.
+    // This isn't desirable if the same devices are re-connected.
+    // The only solution would be to cache the states of the output and
+    // reapply them to the devices of the same name.
+    for (const auto& d : m_devices)
+      d->ResetOutput();
+
+    m_devices.clear();
+  }
+
+  InvokeDevicesChangedCallbacks();
 }
 
 void ControllerInterface::AddDevice(std::shared_ptr<ciface::Core::Device> device)
@@ -275,12 +291,11 @@ void ControllerInterface::AddDevice(std::shared_ptr<ciface::Core::Device> device
 
     NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Added device: {}", device->GetQualifiedName());
     m_devices.emplace_back(std::move(device));
+    //To add devices sorting by "source/group", keyboard/mouse first (which will also make it default)
   }
 
   if (!m_is_populating_devices)
     InvokeDevicesChangedCallbacks();
-
-  assert(m_devices.size() > 0);
 }
 
 void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback)
@@ -289,21 +304,25 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
   if (!m_is_init)
     return;
 
+  bool any_removed;
   {
     std::lock_guard lk(m_devices_mutex);
-    auto it = std::remove_if(m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
-      if (callback(dev.get()))
-      {
-        dev->ResetOutput();
-        NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Removed device: {}", dev->GetQualifiedName());
-        return true;
-      }
-      return false;
-    });
+    auto it = std::remove_if(
+        m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
+          if (callback(dev.get()))
+          {
+            dev->ResetOutput();
+            NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Removed device: {}", dev->GetQualifiedName());
+            return true;
+          }
+          return false;
+        });
+    size_t prev_size = m_devices.size();
     m_devices.erase(it, m_devices.end());
+    any_removed = m_devices.size() != prev_size;
   }
 
-  if (!m_is_populating_devices)
+  if (!m_is_populating_devices && any_removed)
     InvokeDevicesChangedCallbacks();
 }
 
@@ -353,7 +372,7 @@ void ControllerInterface::Reset(ciface::InputChannel input_channel)
 
   // No need to clean s_input_channels_delta_seconds and the others
   tls_input_channel = input_channel;
-  //To review: also call this on Init and on Shutdown? Or maybe put Clock::now() in the constructor?
+  //To review: also call this on Init? Or maybe put Clock::now() in the constructor and shutdown?
   s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
 
   std::lock_guard lk(m_devices_mutex);
@@ -364,7 +383,7 @@ void ControllerInterface::Reset(ciface::InputChannel input_channel)
       const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
       d->ResetInput();
     }
-    //To review: is still necessary/correct?
+    //To review: is still necessary/correct? Check when this is called. It would only be necessary if outputs aren't already resetting themselves.
     // This isn't 100% right as other input channels could still be changing the outputs but
     // as of now that could never happen and even so, it's still better than stuck output values
     d->ResetOutput();
@@ -387,7 +406,7 @@ Common::Vec2 ControllerInterface::GetWindowInputScale() const
 }
 
 // Register a callback to be called when a device is added or removed (as from the input backends'
-// hotplug thread), or when devices are refreshed
+// hotplug thread), or when devices are refreshed. Can be called from "any" thread.
 // Returns a handle for later removing the callback.
 ControllerInterface::HotplugCallbackHandle
 ControllerInterface::RegisterDevicesChangedCallback(std::function<void()> callback)

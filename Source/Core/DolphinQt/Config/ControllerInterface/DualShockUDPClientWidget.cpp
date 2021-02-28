@@ -181,7 +181,7 @@ void DualShockUDPClientWidget::OnCalibrationEnded()
 
 void DualShockUDPClientWidget::OnServersEnabledToggled()
 {
-  bool checked = m_servers_enabled->isChecked();
+  const bool checked = m_servers_enabled->isChecked();
   Config::SetBaseOrCurrent(ciface::DualShockUDPClient::Settings::SERVERS_ENABLED, checked);
   m_add_server->setEnabled(checked);
 
@@ -189,17 +189,19 @@ void DualShockUDPClientWidget::OnServersEnabledToggled()
   m_server_list->setEnabled(checked);
   m_server_list->setSelectionMode(checked ? QAbstractItemView::SelectionMode::SingleSelection :
                                             QAbstractItemView::SelectionMode::NoSelection);
-  if (!checked)
-    m_server_list->clearSelection();
 
-  bool any_selected = m_server_list->currentRow() >= 0;
-  m_remove_server->setEnabled(checked && any_selected);
-  m_calibrate->setEnabled(checked && any_selected);
+  if (!checked)
+  {
+    m_server_list->clearSelection();
+    m_server_list->setCurrentRow(-1);
+  }
+
+  OnServerSelectionChanged();
 }
 
 void DualShockUDPClientWidget::OnServerSelectionChanged()
 {
-  bool any_selected = m_server_list->currentRow() >= 0;
+  const bool any_selected = m_server_list->currentRow() >= 0;
   m_remove_server->setEnabled(any_selected);
   m_calibrate->setEnabled(any_selected);
 }

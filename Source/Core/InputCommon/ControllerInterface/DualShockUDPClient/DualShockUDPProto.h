@@ -113,7 +113,7 @@ struct ListPorts
   MessageHeader header;
   u32 message_type;
   u32 pad_request_count;
-  std::array<u8, 4> pad_id;
+  std::array<u8, 4> pad_ids;
 };
 
 struct PortInfo
