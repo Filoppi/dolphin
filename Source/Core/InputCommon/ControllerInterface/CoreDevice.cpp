@@ -144,15 +144,15 @@ bool Device::Control::IsMatchingName(std::string_view name) const
 void Device::Output::SetState(ControlState state, const void* source_object)
 {
   if (state == 0.f)
-    states.erase(source_object);
+    m_states.erase(source_object);
   else
-    states[source_object] = state;  // Add or update the value
+    m_states[source_object] = state;  // Add or update the value
 
   //To test
   // Find the sum and only set it if is changed.
   // We assume the sum is always what we want, if not, we could have different settings.
   const ControlState final_state =
-      std::accumulate(std::begin(states), std::end(states), 0,
+      std::accumulate(std::begin(m_states), std::end(m_states), 0,
                       [](const ControlState value, const std::pair<const void*, ControlState>& p) {
                         return value + p.second;
                       });
@@ -165,7 +165,7 @@ void Device::Output::SetState(ControlState state, const void* source_object)
 
 void Device::Output::ResetState()
 {
-  states.clear();
+  m_states.clear();
   SetStateInternal(0);
 }
 
