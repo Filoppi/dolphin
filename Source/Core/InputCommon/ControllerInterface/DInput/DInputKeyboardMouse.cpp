@@ -47,7 +47,6 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
   dw.diph.dwHow = DIPH_DEVICE;
   dw.diph.dwObj = 0;
 
-  // TODO: Make sure the SetCooperativeLevel hwnd is valid when we release the device
   // These are "virtual" system devices, so they are always there even if we have no physical
   // mouse and keyboard plugged into the computer
   if (SUCCEEDED(idi8->CreateDevice(GUID_SysKeyboard, &kb_device, nullptr)) &&
@@ -191,6 +190,12 @@ std::string KeyboardMouse::GetName() const
 std::string KeyboardMouse::GetSource() const
 {
   return DINPUT_SOURCE_NAME;
+}
+
+// Give this device a higher priority to make sure it shows first
+int KeyboardMouse::GetSortPriority() const
+{
+  return 5;
 }
 
 // names

@@ -50,7 +50,11 @@ std::string GetDeviceName(const LPDIRECTINPUTDEVICE8 device)
 
 void PopulateDevices(HWND hwnd)
 {
-  // Remove old devices.
+  // Remove old (invalid) devices. No need to ever remove the KeyboardMouse device.
+  // Note that if we have 2+ DInput controllers, not fully repopulating devices
+  // will mean that a device with index "2" could persist while there is no device with index "0".
+  // This is slightly inconsistent as when we refresh all devices, they will instead reset, and
+  // that happens a lot (for uncontrolled reasons, like starting/stopping the emulation).
   g_controller_interface.RemoveDevice(
       [](const auto* dev) { return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsValid(); });
 
