@@ -252,9 +252,10 @@ private:
 using MathUtil::GRAVITY_ACCELERATION;
 constexpr auto SERVER_REREGISTER_INTERVAL = std::chrono::seconds{1};
 constexpr auto SERVER_LISTPORTS_INTERVAL = std::chrono::seconds{1};
-constexpr auto SERVER_MIN_LISTPORTS_INTERVAL = std::chrono::milliseconds{150};
-constexpr auto SERVER_MAX_LISTPORTS_INTERVAL = std::chrono::milliseconds{250};
+constexpr auto THREAD_MAX_WAIT_INTERVAL = std::chrono::milliseconds{250};
+constexpr auto SERVER_UNRESPONSIVE_INTERVAL = std::chrono::seconds{1};  // Can be 0
 constexpr auto RESET_INPUT_INTERVAL = std::chrono::seconds{1};
+constexpr u32 SERVER_ASKED_PADS = 4;
 
 struct Server
 {
@@ -285,6 +286,7 @@ struct Server
   sf::UdpSocket m_socket;
   std::string m_device_type;
   std::string m_calibration;
+  SteadyClock::time_point m_disconnect_time = SteadyClock::now();
 };
 
 static bool s_has_init;
@@ -345,8 +347,8 @@ static void HotplugThreadFunc()
     {
       Proto::Message<Proto::MessageType::ListPorts> msg(s_client_uid);
       auto& list_ports = msg.m_message;
-      // We ask for 4 possible devices. We will receive a message for every connected device.
-      list_ports.pad_request_count = 4;
+      // We ask for x possible devices. We will receive a message for every connected device.
+      list_ports.pad_request_count = SERVER_ASKED_PADS;
       list_ports.pad_ids = {0, 1, 2, 3};
       msg.Finish();
       if (server.m_socket.send(&list_ports, sizeof list_ports, server.m_address, server.m_port) !=
@@ -356,39 +358,42 @@ static void HotplugThreadFunc()
       }
     }
 
-    // Equally spread the timeout between the number of servers.
-    // As of now SERVER_LISTPORTS_INTERVAL is 1 second, so that should be plenty for a lot of
-    // servers. If we don't do this, the first server that is unresponsive will take away from the
-    // time of the following ones.
+    // Equally spread the timeout between the number of servers to avoid waits being too long
+    // and hanging the main thread on closure.
     // We use the "now" from above to avoid breaking while stepping through the code.
     // Note that this thread won't be running if we have no servers.
     const auto timeout = (s_next_listports_time - now) / s_servers.size();
-    // ReceiveWithTimeout treats a timeout of zero as infinite timeout, which we don't want.
-    // Also define a min/max wait time for every server, to make sure this works if we have many,
-    // and that we don't hang the main thread too long when closing this one.
-    const auto adjusted_timeout_ms =
-        std::clamp(duration_cast<milliseconds>(timeout), SERVER_MIN_LISTPORTS_INTERVAL,
-                   SERVER_MAX_LISTPORTS_INTERVAL);
 
     // Receive controller port info within a time from our request.
     // Run this even if we sent no new requests, to disconnect devices,
     // sleep (wait) the thread and catch old responses.
     for (auto& server : s_servers)
     {
-      auto current_timeout_ms = adjusted_timeout_ms;
+      // ReceiveWithTimeout treats a timeout of zero as infinite timeout, which we don't want.
+      // Also define a max wait time for every server, again, to avoid long waits.
+      const auto adujusted_timout_ms =
+          std::clamp(duration_cast<milliseconds>(timeout),
+                     std::chrono::milliseconds(SERVER_ASKED_PADS), THREAD_MAX_WAIT_INTERVAL);
+      auto current_timeout_ms = adujusted_timout_ms / SERVER_ASKED_PADS;
       Proto::Message<Proto::MessageType::FromServer> msg;
       std::size_t received_bytes;
       sf::IpAddress sender;
       u16 port;
       bool timed_out = true;
+      u32 received_messages = 0;
       while (ReceiveWithTimeout(server.m_socket, &msg, sizeof(msg), received_bytes, sender, port,
                                 sf::milliseconds(current_timeout_ms.count())) ==
              sf::Socket::Status::Done)
       {
         if (auto port_info = msg.CheckAndCastTo<Proto::MessageType::PortInfo>())
         {
+          ++received_messages;
+          server.m_disconnect_time = SteadyClock::now() + SERVER_UNRESPONSIVE_INTERVAL;
           timed_out = false;  // We have receive at least one valid update, that's enough
-          current_timeout_ms = 1ms;  // Don't wait longer than necessary for following messages
+          if (received_messages >= SERVER_ASKED_PADS)
+          {
+            current_timeout_ms = 1ms;  // Don't wait longer than necessary for extra messages
+          }
 
           const bool port_changed =
               !IsSameController(*port_info, server.m_port_info[port_info->pad_id]);
@@ -405,16 +410,20 @@ static void HotplugThreadFunc()
       }
 
       // If we have failed to receive any information from the server (or even send it),
-      // disconnect all devices from it.
-      if (timed_out)
+      // disconnect all devices from it (after enough time has elapsed, to avoid false positives).
+      if (timed_out && SteadyClock::now() >= server.m_disconnect_time)
       {
+        bool any_connected = false;
         for (size_t port_index = 0; port_index < server.m_port_info.size(); port_index++)
         {
+          any_connected = any_connected ||
+                          server.m_port_info[port_index].pad_state == Proto::DsState::Connected;
           server.m_port_info[port_index] = {};
           server.m_port_info[port_index].pad_id = static_cast<u8>(port_index);
         }
         // We can't only remove devices added by this server as we wouldn't know which they are
-        g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
+        if (any_connected)
+          g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
       }
     }
 
@@ -429,7 +438,7 @@ static void HotplugThreadFunc()
       {
         if (!s_hotplug_thread_running.IsSet())
           return;
-        auto current_sleep_ms = std::min(sleep_ms, SERVER_MAX_LISTPORTS_INTERVAL);
+        auto current_sleep_ms = std::min(sleep_ms, THREAD_MAX_WAIT_INTERVAL);
         sleep_ms -= current_sleep_ms;
         Common::SleepCurrentThread(current_sleep_ms.count());
       } while (sleep_ms.count() > 0);
