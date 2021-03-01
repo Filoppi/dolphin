@@ -57,12 +57,12 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 
   m_wsi = wsi;
 
-  // Allow backends to add devices as soon as they are initialized.
-  m_is_init = true;
-
   m_is_populating_devices = 1;
 
-  // Make sure no hotplugs threads already add devices here
+  // Allow backends to add devices as soon as they are initialized.
+  // This is likely useless as their thread would lock and devices are cleaned just below here.
+  m_is_init = true;
+
   m_devices_mutex.lock();
 
 #ifdef CIFACE_USE_WIN32
@@ -233,6 +233,8 @@ void ControllerInterface::Shutdown()
   // Make sure no devices had been added within Shutdown() in the time
   // between checking they checked atomic m_is_init bool and we changed it.
   // We couldn't have locked m_devices_mutex for the whole Shutdown() as it could cause deadlocks.
+  // Note that this is still not 100% safe as some backends are shutdown in other places, possibly
+  // adding devices after we have shut down, but the chances of that happening are basically zero.
   ClearDevices();
 }
 
@@ -291,7 +293,19 @@ void ControllerInterface::AddDevice(std::shared_ptr<ciface::Core::Device> device
 
     NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Added device: {}", device->GetQualifiedName());
     m_devices.emplace_back(std::move(device));
-    //To add devices sorting by "source/group", keyboard/mouse first (which will also make it default)
+
+    // We can't (and don't want) to control the order in which devices are added, but we
+    // need their order to be consistent, and we need the same one to always be the first, where
+    // present (the keyboard and mouse device usually). This is because when defaulting a
+    // controller profile, it will automatically select the first device in the list as its default.
+    std::sort(m_devices.begin(), m_devices.end(),
+              [](const std::shared_ptr<ciface::Core::Device>& a,
+                 const std::shared_ptr<ciface::Core::Device>& b) {
+                // It would be nice to sort devices by Source then Name then ID but it's better
+                // to leave them sorted by the add order, which also avoids breaking the order
+                // on other platforms that are less tested.
+                return a->GetSortPriority() > b->GetSortPriority();
+              });
   }
 
   if (!m_is_populating_devices)
