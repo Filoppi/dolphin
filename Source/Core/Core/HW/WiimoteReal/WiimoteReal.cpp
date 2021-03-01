@@ -98,6 +98,7 @@ static void TryToFillWiimoteSlot(u32 index)
 
 // Attempts to fill enabled real wiimote slots.
 // Push/pull wiimotes to/from ControllerInterface as needed.
+// Should be called PopulateDevices() to be in line with other implementations.
 void ProcessWiimotePool()
 {
   std::lock_guard lk(g_wiimotes_mutex);
@@ -675,7 +676,7 @@ void WiimoteScanner::ThreadFunc()
           }
 
           AddWiimoteToPool(std::unique_ptr<Wiimote>(wiimote));
-          ProcessWiimotePool();
+          g_controller_interface.PlatformPopulateDevices([] { ProcessWiimotePool(); });
         }
 
         if (found_board)
@@ -956,12 +957,12 @@ void HandleWiimoteSourceChange(unsigned int index)
     if (auto removed_wiimote = std::move(g_wiimotes[index]))
       AddWiimoteToPool(std::move(removed_wiimote));
   });
-  ProcessWiimotePool();
+  g_controller_interface.PlatformPopulateDevices([] { ProcessWiimotePool(); });
 }
 
 void HandleWiimotesInControllerInterfaceSettingChange()
 {
-  ProcessWiimotePool();
+  g_controller_interface.PlatformPopulateDevices([] { ProcessWiimotePool(); });
 }
 
 }  // namespace WiimoteReal
