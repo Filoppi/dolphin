@@ -189,6 +189,7 @@ void GamecubeControllersWidget::SaveSettings()
     m_gc_buttons[i]->setEnabled(index != 0 && index != 6);
   }
 
+  //To review: Not sure why we are only starting the scan thread after first opening/editing this widget, and why are forcing Save to be called? And why are we manually saving the config?
   if (GCAdapter::UseAdapter())
     GCAdapter::StartScanThread();
   else
