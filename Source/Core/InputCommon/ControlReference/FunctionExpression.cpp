@@ -296,6 +296,14 @@ private:
 };
 
 //To test all functions. smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
+//cache(`Cursor Y+`, hasFocus())
+//hotkey manager, set output filter is broken
+//Test input focus code with pause on unfocus.
+//test single output, wiimote battery focus
+//output mutex and reset outputs on pause
+//Add missing _trans("")
+//prefilled array (???)
+//To merge with master
 
 // usage: interval(delay_frames, duration_frames)
 class IntervalExpression : public FunctionExpression

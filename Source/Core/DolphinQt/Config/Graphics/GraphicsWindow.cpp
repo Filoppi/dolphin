@@ -34,6 +34,7 @@ GraphicsWindow::GraphicsWindow(X11Utils::XRRConfiguration* xrr_config, MainWindo
   setWindowTitle(tr("Graphics"));
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
+  //To review: avoid this saving the config (or just don't call OnConfigChanged when the values is the same).
   OnBackendChanged(QString::fromStdString(Config::Get(Config::MAIN_GFX_BACKEND)));
 }
 

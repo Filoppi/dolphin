@@ -120,7 +120,7 @@ void TestOutput(QPushButton* button, OutputReference* reference)
   // This will hang the UI but it's the simplest way of doing it. Note that the emulation
   // could still change the state of this output during the sleep, to avoid that, we'd need to
   // keep the ControllerEmu::EmulatedController::GetStateLock() on, hanging the emulation.
-  std::this_thread::sleep_for(OUTPUT_TEST_TIME);
+  std::this_thread::sleep_for(OUTPUT_TEST_TIME); //To do: Common::SleepCurrentThread(OUTPUT_TEST_TIME) with duration cast. We could actually not sleep at all now???
   {
     const auto lock = ControllerEmu::EmulatedController::GetStateLock();
     reference->SetState(0.0);

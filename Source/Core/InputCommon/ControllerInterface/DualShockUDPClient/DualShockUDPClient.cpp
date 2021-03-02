@@ -371,6 +371,7 @@ static void HotplugThreadFunc()
     // sleep (wait) the thread and catch old responses.
     for (auto& server : s_servers)
     {
+      //To review: increase time of the first one and fix comments
       // ReceiveWithTimeout treats a timeout of zero as infinite timeout, which we don't want.
       // Also define a max wait time for every server, again, to avoid long waits.
       const auto adujusted_timout_ms =

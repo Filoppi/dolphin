@@ -797,7 +797,6 @@ void MainWindow::OnStopComplete()
 
   SetFullScreenResolution(false);
 
-  //To test this
   if (m_exit_requested || Settings::Instance().IsBatchModeEnabled())
     QGuiApplication::instance()->quit();
 
