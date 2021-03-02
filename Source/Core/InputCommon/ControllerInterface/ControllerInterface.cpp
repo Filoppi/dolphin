@@ -94,9 +94,11 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 
   RefreshDevices();
 
+  const bool devices_empty = m_devices.empty();
+
   m_devices_mutex.unlock();
 
-  if (m_is_populating_devices.fetch_sub(1) == 1 && !m_devices.empty())
+  if (m_is_populating_devices.fetch_sub(1) == 1 && !devices_empty)
     InvokeDevicesChangedCallbacks();
 }
 
