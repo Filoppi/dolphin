@@ -22,6 +22,7 @@ GraphicsChoice::GraphicsChoice(const QStringList& options, const Config::Info<in
     bf.setBold(Config::GetActiveLayerForConfig(m_setting) != Config::LayerType::Base);
     setFont(bf);
 
+    //To review: why is this ending up calling Config::OnConfigChanged() when first loading Graphics settings (or their widget anyway)
     const QSignalBlocker blocker(this);
     setCurrentIndex(Config::Get(m_setting));
   });

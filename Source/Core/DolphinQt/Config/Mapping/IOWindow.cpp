@@ -656,7 +656,7 @@ void IOWindow::ConnectWidgets()
   connect(m_option_list, &QTableWidget::itemSelectionChanged,
           [this] { m_select_button->setEnabled(m_option_list->currentRow() >= 0); });
   
-  //To explain that some axes are relative?
+  //To explain that some axes are relative? And specify that gc refresh input rate is variable and that gc has 2 inputs per video updt
   connect(m_help_button, &QPushButton::clicked, [this] {
     QString help_tooltip =
         tr("You can either simply bind an %1 or use functions\nand operators to achieve more "
