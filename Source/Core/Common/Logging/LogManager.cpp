@@ -123,6 +123,7 @@ LogManager::LogManager()
   m_log[COMMANDPROCESSOR] = {"CP", "Command Processor"};
   m_log[COMMON] = {"COMMON", "Common"};
   m_log[CONSOLE] = {"CONSOLE", "Dolphin Console"};
+  m_log[CONTROLLERINTERFACE] = {"CI", "Controller Interface"};
   m_log[CORE] = {"CORE", "Core"};
   m_log[DISCIO] = {"DIO", "Disc IO"};
   m_log[DSPHLE] = {"DSPHLE", "DSP HLE"};
@@ -161,7 +162,6 @@ LogManager::LogManager()
   m_log[PROCESSORINTERFACE] = {"PI", "Processor Interface"};
   m_log[POWERPC] = {"PowerPC", "PowerPC IBM CPU"};
   m_log[SERIALINTERFACE] = {"SI", "Serial Interface"};
-  m_log[CONTROLLERINTERFACE] = {"ControllerInterface", "Controller Interface"};
   m_log[SP1] = {"SP1", "Serial Port 1"};
   m_log[SYMBOLS] = {"SYMBOLS", "Symbols"};
   m_log[VIDEO] = {"Video", "Video Backend"};
