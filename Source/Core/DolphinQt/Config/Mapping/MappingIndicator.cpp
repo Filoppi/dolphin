@@ -300,7 +300,7 @@ void GenerateFibonacciSphere(int point_count, F&& callback)
 
 }  // namespace
 
-void MappingIndicator::paintEvent(QPaintEvent* asd)
+void MappingIndicator::paintEvent(QPaintEvent*)
 {
   Draw();
 }
