@@ -5,6 +5,7 @@
 #include "InputCommon/ControllerInterface/DInput/DInputKeyboardMouse.h"
 
 #include <algorithm>
+#include <atomic>
 
 #include "Core/Core.h"
 
@@ -25,8 +26,8 @@ static const struct
 #include "InputCommon/ControllerInterface/DInput/NamedKeys.h"  // NOLINT
 };
 
-// Prevent duplicate keyboard/mouse devices.
-static bool s_keyboard_mouse_exists = false;
+// Prevent duplicate keyboard/mouse devices. Modified by more threads.
+static std::atomic<bool> s_keyboard_mouse_exists = false;
 
 void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
 {
