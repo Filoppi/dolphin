@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 
+#include "Common/Logging/Log.h"
 #include "Core/Core.h"
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
@@ -63,6 +64,8 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
     return;
   }
 
+  ERROR_LOG_FMT(CONTROLLERINTERFACE, "KeyboardMouse device failed to be created");
+
   if (kb_device)
     kb_device->Release();
   if (mo_device)
@@ -87,8 +90,10 @@ KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
 {
   s_keyboard_mouse_exists = true;
 
-  m_kb_device->Acquire();
-  m_mo_device->Acquire();
+  if (FAILED(m_kb_device->Acquire()))
+    WARN_LOG_FMT(CONTROLLERINTERFACE, "Keyboard device failed to be aquired (we will retry later on)");
+  if (FAILED(m_mo_device->Acquire()))
+    WARN_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to be aquired (we will retry later on)");
 
   // KEYBOARD
   // add keys
