@@ -91,7 +91,8 @@ KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
   s_keyboard_mouse_exists = true;
 
   if (FAILED(m_kb_device->Acquire()))
-    WARN_LOG_FMT(CONTROLLERINTERFACE, "Keyboard device failed to be aquired (we will retry later on)");
+    WARN_LOG_FMT(CONTROLLERINTERFACE,
+                 "Keyboard device failed to be aquired (we will retry later on)");
   if (FAILED(m_mo_device->Acquire()))
     WARN_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to be aquired (we will retry later on)");
 
@@ -159,8 +160,12 @@ void KeyboardMouse::UpdateInput()
   HRESULT kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
   if (DIERR_INPUTLOST == kb_hr || DIERR_NOTACQUIRED == kb_hr)
   {
+    INFO_LOG_FMT(CONTROLLERINTERFACE, "Keyboard device failed to get state");
     if (SUCCEEDED(m_kb_device->Acquire()))
       kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
+    else
+      INFO_LOG_FMT(CONTROLLERINTERFACE,
+                   "Keyboard device failed to be re-aquired, we will try to again");
   }
 
   UpdateCursorInput();
@@ -170,12 +175,16 @@ void KeyboardMouse::UpdateInput()
   HRESULT mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
   if (DIERR_INPUTLOST == mo_hr || DIERR_NOTACQUIRED == mo_hr)
   {
+    INFO_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to get state");
     // We assume in case the mouse device failed to retrieve the state once, that the
     // state will somehow be reset. This probably can't even happen as its an emulated device
     for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
       m_mouse_axes[i]->ResetAllStates();
     if (SUCCEEDED(m_mo_device->Acquire()))
       mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
+    else
+      INFO_LOG_FMT(CONTROLLERINTERFACE,
+                   "Mouse device failed to be re-aquired, we will try to again");
   }
   if (SUCCEEDED(mo_hr))
   {
