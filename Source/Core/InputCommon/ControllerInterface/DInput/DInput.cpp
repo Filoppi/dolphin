@@ -16,6 +16,8 @@
 
 namespace ciface::DInput
 {
+static IDirectInput8* s_idi8 = nullptr;
+
 BOOL CALLBACK DIEnumDeviceObjectsCallback(LPCDIDEVICEOBJECTINSTANCE lpddoi, LPVOID pvRef)
 {
   ((std::list<DIDEVICEOBJECTINSTANCE>*)pvRef)->push_back(*lpddoi);
@@ -58,17 +60,17 @@ void PopulateDevices(HWND hwnd)
   g_controller_interface.RemoveDevice(
       [](const auto* dev) { return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsValid(); });
 
-  IDirectInput8* idi8;
+  if (s_idi8)
+    s_idi8->Release();
+
   if (FAILED(DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8,
-                                (LPVOID*)&idi8, nullptr)))
+                                (LPVOID*)&s_idi8, nullptr)))
   {
     ERROR_LOG_FMT(CONTROLLERINTERFACE, "DirectInput8Create failed.");
     return;
   }
 
-  InitKeyboardMouse(idi8, hwnd);
-  InitJoystick(idi8, hwnd);
-
-  idi8->Release();
+  InitKeyboardMouse(s_idi8, hwnd);
+  InitJoystick(s_idi8, hwnd);
 }
 }  // namespace ciface::DInput
