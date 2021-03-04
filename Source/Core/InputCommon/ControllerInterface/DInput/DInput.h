@@ -20,4 +20,5 @@ BOOL CALLBACK DIEnumDevicesCallback(LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef);
 std::string GetDeviceName(const LPDIRECTINPUTDEVICE8 device);
 
 void PopulateDevices(HWND hwnd);
+void DeInit();
 }  // namespace ciface::DInput

@@ -61,7 +61,10 @@ void PopulateDevices(HWND hwnd)
       [](const auto* dev) { return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsValid(); });
 
   if (s_idi8)
+  {
     s_idi8->Release();
+    s_idi8 = nullptr;
+  }
 
   if (FAILED(DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8,
                                 (LPVOID*)&s_idi8, nullptr)))
@@ -72,5 +75,14 @@ void PopulateDevices(HWND hwnd)
 
   InitKeyboardMouse(s_idi8, hwnd);
   InitJoystick(s_idi8, hwnd);
+}
+
+void DeInit()
+{
+  if (s_idi8)
+  {
+    s_idi8->Release();
+    s_idi8 = nullptr;
+  }
 }
 }  // namespace ciface::DInput

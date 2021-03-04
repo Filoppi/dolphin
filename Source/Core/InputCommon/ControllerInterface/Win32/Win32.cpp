@@ -157,10 +157,11 @@ void ciface::Win32::DeInit()
     PostMessage(s_message_window, WM_DOLPHIN_STOP, 0, 0);
     s_thread.join();
     s_message_window = nullptr;
-    s_hwnd = nullptr;
     s_received_device_change_event.Reset();
     s_first_pupulate_devices_asked = false;
+    DInput::DeInit();
   }
+  s_hwnd = nullptr;
 
   XInput::DeInit();
 }
