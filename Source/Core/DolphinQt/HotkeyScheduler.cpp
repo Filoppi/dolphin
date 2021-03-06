@@ -156,7 +156,8 @@ void HotkeyScheduler::Run()
     // Cache input for emulation related controllers when emulation is not running (for UI).
     // As an optimization we only process currently attached controllers, but we don't have to.
     // While this doesn't seem thread safe, caching input already has its thread locking inside.
-    if (Core::GetState() == Core::State::Uninitialized)
+    Core::State state = Core::GetState();
+    if (state == Core::State::Uninitialized || state == Core::State::Paused)
     {
       // Wii Remotes aren't updated when emulating GC but they are also not accessible from the UI
       // so we wouldn't need to cache them
