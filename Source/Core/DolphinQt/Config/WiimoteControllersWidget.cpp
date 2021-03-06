@@ -319,8 +319,7 @@ void WiimoteControllersWidget::LoadSettings()
   else
     m_wiimote_emu->setChecked(true);
 
-  // Make sure continuous scanning setting is applied.
-  WiimoteReal::Initialize(::Wiimote::InitializeMode::DO_NOT_WAIT_FOR_WIIMOTES);
+  UpdateDisabledWiimoteControls();
 }
 
 void WiimoteControllersWidget::SaveSettings()
