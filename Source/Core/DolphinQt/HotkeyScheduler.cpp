@@ -45,6 +45,7 @@
 
 constexpr const char* DUBOIS_ALGORITHM_SHADER = "dubois";
 constexpr u32 UPDATE_FREQUENCY = 200;
+constexpr double UPDATE_SECONDS = 1.0 / UPDATE_FREQUENCY;
 
 HotkeyScheduler::HotkeyScheduler() : m_stop_requested(false)
 {
@@ -146,14 +147,16 @@ void HotkeyScheduler::Run()
 
   while (!m_stop_requested.IsSet())
   {
-    // Not sure why we sleep before the first cycle and not after it
-    Common::SleepCurrentThread(1000 / UPDATE_FREQUENCY);
+    // We don't need this to be too accurate or to catch up after longer sleeps.
+    // We sleep before and not after just to avoid dealing with all the continue cases.
+    std::this_thread::sleep_for(std::chrono::duration<double>(UPDATE_SECONDS));
 
-    g_controller_interface.UpdateInput(ciface::InputChannel::FreeLook, 1.0 / UPDATE_FREQUENCY);
+    g_controller_interface.UpdateInput(ciface::InputChannel::FreeLook, UPDATE_SECONDS);
     FreeLook::UpdateInput();
 
-    // We always pass in UPDATE_FREQUENCY as the input doesn't care about sleep ms variations
-    g_controller_interface.UpdateInput(ciface::InputChannel::Host, 1.0 / UPDATE_FREQUENCY);
+    // We always pass in UPDATE_FREQUENCY as the input doesn't care about sleep ms variations.
+    // The actual time delta is already calculated inside here.
+    g_controller_interface.UpdateInput(ciface::InputChannel::Host, UPDATE_SECONDS);
 
     // Cache input for emulation related controllers when emulation is not running (for UI).
     // As an optimization we only process currently attached controllers, but we don't have to.
@@ -222,7 +225,7 @@ void HotkeyScheduler::Run()
       {
         emit FullScreenHotkey();
 
-        // Prevent fullscreen from getting toggled too often
+        // Hack: prevent fullscreen from getting toggled too often
         Common::SleepCurrentThread(100);
       }
 
