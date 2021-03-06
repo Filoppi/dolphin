@@ -148,12 +148,10 @@ ControllerEmu::ControlGroup* FreeLookController::GetGroup(FreeLookGroup group) c
 
 void FreeLookController::Update()
 {
-  CacheInput();
-
   if (!g_freelook_camera.IsActive())
     return;
 
-  const auto lock = GetStateLock();
+  CacheInput();
 
   if (m_move_buttons->controls[MoveButtons::Up]->GetState<bool>())
     g_freelook_camera.MoveVertical(-g_freelook_camera.GetSpeed());
