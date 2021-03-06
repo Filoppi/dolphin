@@ -151,7 +151,7 @@ void Device::Output::SetState(ControlState state, const void* source_object)
   // Find the sum and only set it if is changed.
   // We assume the sum is always what we want, if not, we could have different settings.
   const ControlState final_state =
-      std::accumulate(std::begin(m_states), std::end(m_states), 0,
+      std::accumulate(std::begin(m_states), std::end(m_states), ControlState(0),
                       [](const ControlState value, const std::pair<const void*, ControlState>& p) {
                         return value + p.second;
                       });
