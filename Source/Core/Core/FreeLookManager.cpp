@@ -196,12 +196,10 @@ ControllerEmu::ControlGroup* FreeLookController::GetGroup(FreeLookGroup group) c
 
 void FreeLookController::Update()
 {
-  CacheInput();
-
   if (!g_freelook_camera.IsActive())
     return;
 
-  const auto lock = GetStateLock();
+  CacheInput();
 
   float dt = 1.0;
   if (m_last_free_look_rotate_time)
