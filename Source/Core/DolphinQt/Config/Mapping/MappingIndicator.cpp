@@ -259,7 +259,7 @@ bool IsPointOutsideCalibration(Common::DVec2 point, ControllerEmu::ReshapableInp
   const double input_radius = input.GetInputRadiusAtAngle(
       std::atan2(point.y - center.y, point.x - center.x) + MathUtil::TAU);
 
-  constexpr double ALLOWED_ERROR = 1.3;
+  constexpr double ALLOWED_ERROR = 1.0;
 
   return current_radius > input_radius * ALLOWED_ERROR;
 }
@@ -926,7 +926,6 @@ CalibrationWidget::CalibrationWidget(ControllerEmu::ReshapableInput& input,
 
 void CalibrationWidget::SetupActions()
 {
-  //To review: this button turns red too late, also the grey dot behind the red is sometimes offsetted
   const auto calibrate_action = new QAction(tr("Calibrate"), this);
   const auto center_action = new QAction(tr("Center and Calibrate"), this);
   const auto reset_action = new QAction(tr("Reset"), this);
