@@ -52,6 +52,7 @@ void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
     }
 
     LPDIRECTINPUTDEVICE8 js_device;
+    // Don't print any warnings on failure
     if (SUCCEEDED(idi8->CreateDevice(joystick.guidInstance, &js_device, nullptr)))
     {
       if (SUCCEEDED(js_device->SetDataFormat(&c_dfDIJoystick)))
@@ -66,31 +67,31 @@ void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
           if (FAILED(
                   js_device->SetCooperativeLevel(nullptr, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)))
           {
-            // PanicAlert("SetCooperativeLevel failed!");
             js_device->Release();
             continue;
           }
         }
 
-        s_guids_in_use.insert(joystick.guidInstance);
         auto js = std::make_shared<Joystick>(js_device);
-
-        // only add if it has some inputs/outputs
+        // only add if it has some inputs/outputs.
+        // Don't even add it to our static list in case we first created it without a window handle,
+        // failing to get exclusive mode, and then later managed to obtain it, which mean it
+        // could now have some outputs if it didn't before.
         if (js->Inputs().size() || js->Outputs().size())
+        {
+          s_guids_in_use.insert(joystick.guidInstance);
           g_controller_interface.AddDevice(std::move(js));
+        }
       }
       else
       {
-        // PanicAlert("SetDataFormat failed!");
         js_device->Release();
       }
     }
   }
 }
 
-Joystick::Joystick(/*const LPCDIDEVICEINSTANCE lpddi, */ const LPDIRECTINPUTDEVICE8 device)
-    : m_device(device)
-//, m_name(TStringToString(lpddi->tszInstanceName))
+Joystick::Joystick(const LPDIRECTINPUTDEVICE8 device) : m_device(device)
 {
   // seems this needs to be done before GetCapabilities
   // polled or buffered data
