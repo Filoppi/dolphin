@@ -787,7 +787,7 @@ void IOWindow::OnTestSelectedButtonPressed()
     return;
 
   MappingCommon::TestOutput(
-      m_test_selected_button, GetSelectedDevice().get(),
+      m_test_selected_button, g_controller_interface, GetSelectedDevice().get(),
       m_option_list->item(m_option_list->currentRow(), 0)->text().toStdString());
 }
 

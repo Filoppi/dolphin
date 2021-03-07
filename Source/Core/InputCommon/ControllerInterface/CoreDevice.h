@@ -217,6 +217,7 @@ protected:
   // It has a map of states as different objects can set its value.
   // The sum of all the states will be used as output.
   // You are responsible of calling SetState(0, source_object) after calling it with any other val.
+  // SetState() and ResetState() need GetDevicesOutputLock().
   //
   class Output : public Control
   {
@@ -353,6 +354,8 @@ public:
   std::string GetDefaultDeviceString() const;
   std::shared_ptr<Device> FindDevice(const DeviceQualifier& devq) const;
 
+  std::unique_lock<std::mutex> GetDevicesOutputLock() const;
+
   bool HasConnectedDevice(const DeviceQualifier& qualifier) const;
 
   std::vector<InputDetection> DetectInput(const std::vector<std::string>& device_strings,
@@ -361,7 +364,10 @@ public:
                                           std::chrono::milliseconds maximum_wait) const;
 
 protected:
+  // Exclusively needed when reading/writing "m_devices"
   mutable std::recursive_mutex m_devices_mutex;
+  // Needed when setting values/state on outputs
+  mutable std::mutex m_devices_output_mutex;
   std::vector<std::shared_ptr<Device>> m_devices;
 };
 }  // namespace Core

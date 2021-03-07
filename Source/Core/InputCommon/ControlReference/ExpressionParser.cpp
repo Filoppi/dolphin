@@ -19,6 +19,7 @@
 #include "Common/Common.h"
 #include "Common/StringUtil.h"
 
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControlReference/FunctionExpression.h"
 
@@ -254,7 +255,10 @@ public:
   {
     // Reset state to the resting value or it would persist.
     if (m_output)
+    {
+      const auto lock = g_controller_interface.GetDevicesOutputLock();
       m_output->SetState(0.0, this);
+    }
   }
 
   ControlState GetValue() const override
@@ -281,7 +285,11 @@ public:
   void SetValue(ControlState value) override
   {
     if (m_output)
+    {
+      // Just lock this only when strictly necessary
+      const auto lock = g_controller_interface.GetDevicesOutputLock();
       m_output->SetState(value, this);
+    }
   }
   int CountNumControls() const override { return (m_input || m_output) ? 1 : 0; }
   Device::FocusFlags GetFocusFlags() const override
