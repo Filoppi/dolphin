@@ -31,6 +31,7 @@ public:
   // Also updates the state. We need a seperate state for the UI otherwise when the render widget
   // loses focus, we might not be able to preview values from the mapping widgets, and we'd also
   // pollute the game state from the UI update.
+  // Absolute time meant like the "emulation elapsed time"
   StateData GetState(bool is_ui, float absolute_time_elapsed = -1.f);
 
   void ResetState(bool is_ui);
@@ -59,7 +60,7 @@ private:
   int m_auto_hide_timer[2] = {AUTO_HIDE_MS, AUTO_HIDE_MS};
 
   using Clock = std::chrono::steady_clock;
-  Clock::time_point m_last_update[2];
+  Clock::time_point m_last_ui_update;
 
   SettingValue<double> m_yaw_setting;
   SettingValue<double> m_pitch_setting;
