@@ -7,6 +7,7 @@
 #include <atomic>
 #include <string>
 
+#include "Common/Assert.h"
 #include "Common/CommonTypes.h"
 #include "Common/IniFile.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
@@ -108,7 +109,7 @@ public:
       : NumericSettingBase(details), m_value(*value), m_default_value(default_value),
         m_min_value(min_value), m_max_value(max_value), m_edit_condition(edit_condition)
   {
-    assert(m_max_value >= m_min_value);  // Let them be equal
+    ASSERT(m_max_value >= m_min_value);  // Let them be equal
     // Theoretically not needed but avoid log errors
     const auto lock = EmulatedController::GetStateLock();
     m_value.SetValue(m_default_value);

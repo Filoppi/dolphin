@@ -189,7 +189,7 @@ KeyboardMouse::KeyboardMouse(Window window, int opcode, int pointer, int keyboar
     const u8 index = !!(i & 2);
     Axis* axis = new Axis(scale, index);
     m_mouse_axes.push_back(axis);
-    AddInput();
+    AddInput(axis);
   }
 }
 
