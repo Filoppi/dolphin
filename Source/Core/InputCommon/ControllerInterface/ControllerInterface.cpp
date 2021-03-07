@@ -55,6 +55,9 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
   if (m_is_init)
     return;
 
+  for (u8 i = 0; i < u8(ciface::InputChannel::Max); ++i)
+    s_input_channels_last_update[i] = Clock::now();
+
   m_wsi = wsi;
 
   m_is_populating_devices = 1;
@@ -380,29 +383,36 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
   }
 }
 
-// Call this when you are "closing" (stopping to update) an input channel
-void ControllerInterface::Reset(ciface::InputChannel input_channel)
+// Call this when you are toggling pause or "closing" (stopping to update) an input channel.
+// Not mandatory.
+void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, bool running)
 {
   if (!m_is_init)
     return;
 
   // No need to clean s_input_channels_delta_seconds and the others
   tls_input_channel = input_channel;
-  //To review: also call this on Init? Or maybe put Clock::now() in the constructor and shutdown?
-  s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
 
   std::lock_guard lk(m_devices_mutex);
 
-  for (auto& d : m_devices)
+  if (running)
   {
+    s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
+
+    for (auto& d : m_devices)
     {
       const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
       d->ResetInput();
     }
-    //To review: is still necessary/correct? Check when this is called. It would only be necessary if outputs aren't already resetting themselves.
-    // This isn't 100% right as other input channels could still be changing the outputs but
-    // as of now that could never happen and even so, it's still better than stuck output values
-    d->ResetOutput();
+  }
+  else
+  {
+    for (auto& d : m_devices)
+    {
+      // This isn't 100% right as other input channels could still be changing the outputs but
+      // as of now that could never happen and even so, it's still better than stuck output values
+      d->ResetOutput();
+    }
   }
 }
 

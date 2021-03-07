@@ -143,6 +143,8 @@ void HotkeyScheduler::Run()
 {
   Common::SetCurrentThreadName("HotkeyScheduler");
 
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::Host, true);
+
   while (!m_stop_requested.IsSet())
   {
     // We don't need this to be too accurate or to catch up after longer sleeps.
@@ -629,7 +631,7 @@ void HotkeyScheduler::Run()
       emit StateSaveFile();
   }
 
-  g_controller_interface.Reset(ciface::InputChannel::Host);
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::Host, false);
 }
 
 void HotkeyScheduler::CheckDebuggingHotkeys()

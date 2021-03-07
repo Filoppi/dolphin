@@ -431,9 +431,8 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     s_is_stopping = false;
     s_wants_determinism = false;
 
-    // Reset output and relative input of game input channels
-    g_controller_interface.Reset(ciface::InputChannel::SerialInterface);
-    g_controller_interface.Reset(ciface::InputChannel::Bluetooth);
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
 
     if (s_on_state_changed_callback)
       s_on_state_changed_callback(State::Uninitialized);
@@ -663,12 +662,16 @@ void SetState(State state)
     // NOTE: GetState() will return State::Paused immediately, even before anything has
     //   stopped (including the CPU).
     CPU::EnableStepping(true);  // Break
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
     Wiimote::Pause();
     ResetRumble();
     break;
   case State::Running:
     CPU::EnableStepping(false);
     Wiimote::Resume();
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, true);
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, true);
     break;
   default:
     PanicAlertFmt("Invalid state");
