@@ -436,6 +436,8 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
       // as of now that could never happen and even so, it's still better than stuck output values
       d->ResetOutput();
     }
+    // TODO: after calling SetChannelRunning() we should force re-apply all the current
+    // OutputReference(s)
   }
 
   tls_input_channel = prev_input_channel;

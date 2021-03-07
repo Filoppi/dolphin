@@ -32,8 +32,8 @@ public:
   virtual void SetState(ControlState state = 0){};
   virtual bool IsInput() const = 0;
   // As of now this is used to cache input values and to calculate the expression state only once,
-  // as some of them are are frame based.
-  virtual void UpdateState(){};
+  // as some of them are are frame based. While on outputs it's used to actually apply them.
+  virtual void UpdateState() = 0;
 
   template <typename T>
   T GetState() const;
@@ -148,4 +148,13 @@ public:
   OutputReference(ControlState range_ = DEFAULT_RANGE);
   bool IsInput() const override;
   void SetState(const ControlState state) override;
+  // The role of UpdateState() in outputs is kind of inverted.
+  // SetState() does the caching, while the update applies them.
+  void UpdateState() override;
+  // Does not apply it. Call UpdateState() after if you want.
+  void ResetState();
+
+protected:
+  // Doesn't need to be atomic, it's not cuncurrent
+  ControlState m_cached_states[u8(ciface::InputChannel::Max)];
 };
