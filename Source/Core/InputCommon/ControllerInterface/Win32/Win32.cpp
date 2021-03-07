@@ -149,6 +149,15 @@ void ciface::Win32::PopulateDevices(void* hwnd)
   }
 }
 
+void ciface::Win32::ChangeWindow(void* hwnd)
+{
+  if (s_thread.joinable())  // "Has init?"
+  {
+    s_hwnd = static_cast<HWND>(hwnd);
+    ciface::DInput::ChangeWindow(s_hwnd);
+  }
+}
+
 void ciface::Win32::DeInit()
 {
   NOTICE_LOG_FMT(CONTROLLERINTERFACE, "win32 DeInit");

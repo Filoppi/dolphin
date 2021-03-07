@@ -50,8 +50,16 @@ std::string GetDeviceName(const LPDIRECTINPUTDEVICE8 device)
   return result;
 }
 
+// Assumes hwnd had not changed from the previous call
 void PopulateDevices(HWND hwnd)
 {
+  if (!s_idi8 && FAILED(DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION,
+                                           IID_IDirectInput8, (LPVOID*)&s_idi8, nullptr)))
+  {
+    ERROR_LOG_FMT(CONTROLLERINTERFACE, "DirectInput8Create failed.");
+    return;
+  }
+
   // Remove old (invalid) devices. No need to ever remove the KeyboardMouse device.
   // Note that if we have 2+ DInput controllers, not fully repopulating devices
   // will mean that a device with index "2" could persist while there is no device with index "0".
@@ -60,21 +68,22 @@ void PopulateDevices(HWND hwnd)
   g_controller_interface.RemoveDevice(
       [](const auto* dev) { return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsValid(); });
 
-  if (s_idi8)
-  {
-    s_idi8->Release();
-    s_idi8 = nullptr;
-  }
-
-  if (FAILED(DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8,
-                                (LPVOID*)&s_idi8, nullptr)))
-  {
-    ERROR_LOG_FMT(CONTROLLERINTERFACE, "DirectInput8Create failed.");
-    return;
-  }
-
   InitKeyboardMouse(s_idi8, hwnd);
   InitJoystick(s_idi8, hwnd);
+}
+
+void ChangeWindow(HWND hwnd)
+{
+  if (s_idi8)  // Has init? Ignore if called before the first PopulateDevices()
+  {
+    // The KeyboardMouse device is marked as virtual device, so we avoid removing it
+    g_controller_interface.RemoveDevice([](const auto* dev) {
+      return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsVirtualDevice();
+    });
+
+    SetKeyboardMouseWindow(hwnd);
+    InitJoystick(s_idi8, hwnd);
+  }
 }
 
 void DeInit()
