@@ -66,6 +66,9 @@ MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool 
 
 void MappingButton::AdvancedPressed()
 {
+  // Don't update values in the parent widget as we are customizing them. Can't use QSignalBlocker
+  m_parent->SetBlockUpdate(true);
+
   IOWindow io(m_parent, m_parent->GetController(), m_reference,
               m_reference->IsInput() ? IOWindow::Type::Input : IOWindow::Type::Output,
               m_button_name);
@@ -73,6 +76,8 @@ void MappingButton::AdvancedPressed()
 
   ConfigChanged();
   m_parent->SaveSettings();
+
+  m_parent->SetBlockUpdate(false);
 }
 
 void MappingButton::Clicked()
@@ -133,7 +138,10 @@ void MappingButton::UpdateIndicator()
   QFont f = m_parent->font();
   
   // This won't detect all devices unless they have their path in front of them.
-  if (m_reference->IsInput() && m_reference->GetState<bool>())
+  // We don't want to show the results here if we are editing the mapping,
+  // as it would show the previous expression highlighting based on the new (pending)
+  // expression result.
+  if (m_reference->IsInput() && m_reference->GetState<bool>() && !m_parent->GetBlockUpdate())
     f.setBold(true);
 
   setFont(f);
