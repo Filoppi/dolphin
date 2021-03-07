@@ -109,28 +109,7 @@ void WiimoteEmuGeneral::ConfigChanged()
       Wiimote::GetWiimoteGroup(GetPort(), WiimoteEmu::WiimoteGroup::Attachments));
 
   if (m_extension_combo->count() > 0)
-  {
-    if (!ce_extension->GetSelectionSetting().IsSimpleValue())
-    {
-      const QSignalBlocker blocker(m_extension_combo);
-      //To revert?
-      // We can't preview the value from the expression in m_extension_combo, it might be dynamic!
-      m_extension_combo->setItemText(0, tr("Set by Expression"));
-      m_extension_combo->setCurrentIndex(0);
-      OnAttachmentChanged(-1);  // Set "no" (not "None") attachments in the UI
-      // Just disable section for simplicity, or we'd need to rename Item 0 on click
-      m_extension_combo->setEnabled(false);
-    }
-    else
-    {
-      m_extension_combo->setItemText(
-          0, tr(ce_extension->GetAttachmentList()[0]->GetDisplayName().c_str()));
-      if (m_extension_combo->currentIndex() == int(ce_extension->GetSelectedAttachment()))
-        OnAttachmentChanged(m_extension_combo->currentIndex());
-      m_extension_combo->setCurrentIndex(ce_extension->GetSelectedAttachment());
-      m_extension_combo->setEnabled(true);
-    }
-  }
+    m_extension_combo->setCurrentIndex(ce_extension->GetSelectedAttachment());
 
   m_extension_combo_dynamic_indicator->setVisible(
       !ce_extension->GetSelectionSetting().IsSimpleValue());
@@ -140,12 +119,9 @@ void WiimoteEmuGeneral::Update()
 {
   auto* ce_extension = static_cast<ControllerEmu::Attachments*>(
       Wiimote::GetWiimoteGroup(GetPort(), WiimoteEmu::WiimoteGroup::Attachments));
-    
-  if (m_extension_combo->count() > 0 && ce_extension->GetSelectionSetting().IsSimpleValue() &&
-      !m_block_update)
-  {
+
+  if (m_extension_combo->count() > 0 && !m_block_update)
     m_extension_combo->setCurrentIndex(ce_extension->GetSelectedAttachment());
-  }
 }
 
 void WiimoteEmuGeneral::LoadSettings()
