@@ -27,7 +27,7 @@ static const struct
 };
 
 // Prevent duplicate keyboard/mouse devices. Modified by more threads.
-static std::atomic<bool> s_keyboard_mouse_exists = false;
+static bool s_keyboard_mouse_exists;
 static HWND s_hwnd;
 
 void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
