@@ -193,7 +193,7 @@ void Wiimote::Reset()
 
   m_imu_cursor_state = {};
 
-  m_ir->ResetState();
+  m_ir->ResetState(false);
 }
 
 Wiimote::Wiimote(const unsigned int index) : m_index(index)

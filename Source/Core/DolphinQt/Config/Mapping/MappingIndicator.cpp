@@ -310,8 +310,7 @@ void CursorIndicator::Draw()
   // Theoretically this should be updated at the same rate input devices are updated if using
   // the relative setting, otherwise some relative movements would be lost and some read twice, but
   // it's not a big deal, being UI only.
-  // Only update the cursor state if emulation is not running, otherwise get the last state.
-  const auto adj_coord = m_cursor_group.GetState(Core::GetState() == Core::State::Uninitialized);
+  const auto adj_coord = m_cursor_group.GetState(true);
 
   DrawReshapableInput(m_cursor_group, CURSOR_TV_COLOR,
                       adj_coord.IsVisible() ?

@@ -12,11 +12,6 @@
 
 namespace ControllerEmu
 {
-// Instead of having two instances of this, we have one with two states,
-// one for the UI and one for the game. Otherwise when bringing up the
-// input settings, it would also affect the cursor state in the game.
-// This is not a problem with other ReshapableInput as they don't
-// cache a state
 class Cursor : public ReshapableInput
 {
 public:
@@ -33,9 +28,12 @@ public:
   ReshapeData GetReshapableState(bool adjusted) const final override;
   ControlState GetGateRadiusAtAngle(double ang) const override;
 
-  StateData GetState(bool update = false, float absolute_time_elapsed = -1.f);
+  // Also updates the state. We need a seperate state for the UI otherwise when the render widget
+  // loses focus, we might not be able to preview values from the mapping widgets, and we'd also
+  // pollute the game state from the UI update.
+  StateData GetState(bool is_ui, float absolute_time_elapsed = -1.f);
 
-  void ResetState();
+  void ResetState(bool is_ui);
 
   // Yaw movement in radians.
   ControlState GetTotalYaw() const;
@@ -55,15 +53,13 @@ private:
   static constexpr double AUTO_HIDE_DEADZONE = 0.001;
 
   // Not adjusted by width/height/center.
-  StateData m_state;
-  StateData m_prev_state;
-  // Includes auto hide, we need to keep the other states as auto hide would lose the values
-  StateData m_final_state;
+  StateData m_state[2];
+  StateData m_prev_state[2];
 
-  int m_auto_hide_timer = AUTO_HIDE_MS;
+  int m_auto_hide_timer[2] = {AUTO_HIDE_MS, AUTO_HIDE_MS};
 
   using Clock = std::chrono::steady_clock;
-  Clock::time_point m_last_update;
+  Clock::time_point m_last_update[2];
 
   SettingValue<double> m_yaw_setting;
   SettingValue<double> m_pitch_setting;
