@@ -296,7 +296,6 @@ public:
     return m_input ? m_input->GetFocusFlags() :
                      (m_output ? Device::FocusFlags::OutputDefault : Device::FocusFlags::Default);
   }
-  //To review: is_input probably isn't necessary anymore with since outputs have a map (still, explain the problems) (previous comment: (prioritize it)). Also review long comment (???)
   void UpdateReferences(ControlEnvironment& env, bool is_input) override
   {
     Device::Output* previous_output = m_output;
@@ -306,6 +305,13 @@ public:
     m_device = env.FindDevice(m_qualifier);
     if (m_device)
     {
+      // This check prevents a few problems:
+      // Avoids assigning both m_input and m_ouput in case they had the same name.
+      // Also avoids outputs being accidentally set by input expressions,
+      // or inputs being read by output expression. This is because we want to avoid acquiring
+      // ControllerEmu::EmulatedController::GetDevicesInputLock() when setting values in output
+      // expression or g_controller_interface.GetDevicesOutputLock() when getting values in input
+      // expressions. And doing such things is just unnecessary and hacky anyway.
       if (is_input)
         m_input = m_device->FindInput(m_qualifier.control_name);
       else
@@ -497,22 +503,29 @@ static ParseResult MakeLiteralExpression(Token token)
     return ParseResult::MakeErrorResult(token, _trans("Invalid literal."));
 }
 
+// These are "shared" states variables that can be used by multiple control references
+// within the same (parent) controller
 class VariableExpression : public Expression
 {
 public:
   VariableExpression(std::string name) : m_name(name) {}
 
-  ControlState GetValue() const override { return *m_value_ptr; }
+  ControlState GetValue() const override { return m_value_ptr ? *m_value_ptr : 0; }
 
-  void SetValue(ControlState value) override { *m_value_ptr = value; }
+  void SetValue(ControlState value) override
+  {
+    if (m_value_ptr)
+      *m_value_ptr = value;
+  }
 
   // This can point to anything but it should probably ignore focus by default
   Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
 
   int CountNumControls() const override { return 1; }
 
-  void UpdateReferences(ControlEnvironment& env, bool) override
+  void UpdateReferences(ControlEnvironment& env, bool is_input) override
   {
+    // There is no need to use "is_input" unless we wanted to separate them between input and output
     m_value_ptr = env.GetVariablePtr(m_name);
   }
 

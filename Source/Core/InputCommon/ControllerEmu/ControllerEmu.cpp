@@ -45,6 +45,7 @@ void EmulatedController::EnsureStateLock()
 }
 std::unique_lock<std::recursive_mutex> EmulatedController::GetDevicesInputLock()
 {
+  // Needs to be recursive because controllers cache their own attached controllers
   std::unique_lock<std::recursive_mutex> lock(s_devices_input_mutex);
   return lock;
 }

@@ -1235,6 +1235,7 @@ private:
 
     const ControlState max_abs_value = (GetArgCount() >= 3) ? GetArg(2).GetValue() : 1.0;
 
+    // This will likely (hopefully) be a VariableExpression.
     if (GetArgCount() >= 4)
       m_state = GetArg(3).GetValue();
 
