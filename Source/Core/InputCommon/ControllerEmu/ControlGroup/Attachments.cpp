@@ -19,7 +19,6 @@ u32 Attachments::GetSelectedAttachment() const
 {
   const int value = m_selection_value.GetValue();
 
-  //To review int/size_t...
   if (value > 0 && value < m_attachments.size())
     return u32(value);
 
