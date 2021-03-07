@@ -71,8 +71,8 @@ static constexpr std::array<u32, 2> s_clock_freqs{{
 
 static u64 s_ticks_last_line_start;  // number of ticks when the current full scanline started
 static u32 s_half_line_count;        // number of halflines that have occurred for this full frame
-static u32 s_half_line_of_next_si_poll;  // halfline when next SI poll results should be available
-static u64 s_prev_si_poll_ticks;     // number of ticks at the last SI poll
+static u32 s_half_line_of_next_si_poll;   // halfline when next SI poll results should be available
+static u64 s_prev_si_poll_ticks;          // number of ticks at the last SI poll
 static double s_prev_si_poll_delta_time;  // delta time between the last two SI polls
 static constexpr u32 num_half_lines_for_si_poll = (7 * 2) + 1;  // this is how long a SI poll takes
 

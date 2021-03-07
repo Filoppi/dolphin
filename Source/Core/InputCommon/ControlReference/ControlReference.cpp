@@ -2,9 +2,9 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 #include <algorithm>
 
@@ -55,7 +55,10 @@ static thread_local u8 tls_gate_channel = u8(ciface::InputChannel::Host);
 // than one input channel.
 static thread_local std::vector<const InputReference*> tls_blocked_inputs;
 
-GateFlags& GetCurrentGateFlags() { return tls_gate_flags[tls_gate_channel]; }
+GateFlags& GetCurrentGateFlags()
+{
+  return tls_gate_flags[tls_gate_channel];
+}
 
 //
 // UpdateReference
@@ -208,8 +211,9 @@ bool ControlReference::PassesGate() const
       (u8(gate_flags) & u8(GateFlags::IgnoreInputOnFocusChanged)) &&
       (focus_flags & u8(Device::FocusFlags::RequireFocus)))
   {
-    std::vector<const InputReference*>::iterator it = std::find(
-        tls_blocked_inputs.begin(), tls_blocked_inputs.end(), static_cast<const InputReference*>(this));
+    std::vector<const InputReference*>::iterator it =
+        std::find(tls_blocked_inputs.begin(), tls_blocked_inputs.end(),
+                  static_cast<const InputReference*>(this));
     if (it != tls_blocked_inputs.end())
       return false;
   }

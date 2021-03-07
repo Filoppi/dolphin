@@ -39,7 +39,7 @@ public:
   int CountNumControls() const override;
   Device::FocusFlags GetFocusFlags() const override;
   void UpdateReferences(ControlEnvironment& env, bool is_input) override;
-  
+
   ArgumentValidation SetArguments(std::vector<std::unique_ptr<Expression>>&& args);
 
   // These will be shown in the UI so wrap them in _trans(). Automatically word wrapped.

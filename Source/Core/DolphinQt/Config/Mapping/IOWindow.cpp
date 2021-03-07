@@ -27,19 +27,19 @@
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 
-#include "DolphinQt/Settings.h"
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 #include "DolphinQt/Config/Mapping/MappingIndicator.h"
 #include "DolphinQt/Config/Mapping/MappingWidget.h"
 #include "DolphinQt/Config/Mapping/MappingWindow.h"
 #include "DolphinQt/QtUtils/BlockUserInputFilter.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
+#include "DolphinQt/Settings.h"
 
-#include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControlReference/ExpressionParser.h"
 #include "InputCommon/ControlReference/FunctionExpression.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
+#include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 constexpr int RANGE_PERCENTAGE = 100;
@@ -305,16 +305,18 @@ void IOWindow::CreateMainLayout()
 
   if (m_numeric_setting)
   {
-    m_parse_text = new InputStateLineEdit([this] {
-      if (m_reference->IsInput())
-      {
-        // This is needed because numeric settings simplify the expression (and set it to
-        // nullptr/"") when they have a simple value, so we don't want to read the expression value
-        // anymore, but their cached in custom value.
-        return m_numeric_setting->GetGenericValue();
-      }
-      return 0.0;
-    }, m_numeric_setting->GetGenericMinValue(), m_numeric_setting->GetGenericMaxValue());
+    m_parse_text = new InputStateLineEdit(
+        [this] {
+          if (m_reference->IsInput())
+          {
+            // This is needed because numeric settings simplify the expression (and set it to
+            // nullptr/"") when they have a simple value, so we don't want to read the expression
+            // value anymore, but their cached in custom value.
+            return m_numeric_setting->GetGenericValue();
+          }
+          return 0.0;
+        },
+        m_numeric_setting->GetGenericMinValue(), m_numeric_setting->GetGenericMaxValue());
   }
   else
   {
@@ -678,8 +680,10 @@ void IOWindow::ConnectWidgets()
   connect(&Settings::Instance(), &Settings::DevicesChanged, this, &IOWindow::UpdateDeviceList);
 
   connect(m_detect_button, &QPushButton::clicked, this, &IOWindow::OnDetectButtonPressed);
-  connect(m_test_selected_button, &QPushButton::clicked, this, &IOWindow::OnTestSelectedButtonPressed);
-  connect(m_test_results_button, &QPushButton::clicked, this, &IOWindow::OnTestResultsButtonPressed);
+  connect(m_test_selected_button, &QPushButton::clicked, this,
+          &IOWindow::OnTestSelectedButtonPressed);
+  connect(m_test_results_button, &QPushButton::clicked, this,
+          &IOWindow::OnTestResultsButtonPressed);
 
   connect(m_button_box, &QDialogButtonBox::clicked, this, &IOWindow::OnDialogButtonPressed);
   connect(m_devices_combo, &QComboBox::currentTextChanged, this, &IOWindow::OnDeviceChanged);

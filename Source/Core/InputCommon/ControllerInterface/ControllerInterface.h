@@ -12,8 +12,8 @@
 
 #include "Common/Matrix.h"
 #include "Common/WindowSystemInfo.h"
-#include "InputCommon/ControllerInterface/InputChannel.h"
 #include "InputCommon/ControllerInterface/CoreDevice.h"
+#include "InputCommon/ControllerInterface/InputChannel.h"
 
 // enable/disable sources
 #ifdef _WIN32

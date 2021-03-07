@@ -18,7 +18,8 @@
 #include "Common/Config/Config.h"
 #include "InputCommon/ControllerInterface/DualShockUDPClient/DualShockUDPClient.h"
 
-DualShockUDPClientCalibrationDialog::DualShockUDPClientCalibrationDialog(QWidget* parent, int server_index)
+DualShockUDPClientCalibrationDialog::DualShockUDPClientCalibrationDialog(QWidget* parent,
+                                                                         int server_index)
     : QDialog(parent), m_server_index(server_index)
 {
   CreateWidgets();
@@ -55,7 +56,7 @@ void DualShockUDPClientCalibrationDialog::CreateWidgets()
   m_main_layout->addWidget(m_max_y, 4, 1);
   m_main_layout->addWidget(new QLabel(tr("Device State:")), 5, 0);
   m_main_layout->addWidget(m_device_state, 5, 1);
-  
+
   m_button_box = new QDialogButtonBox();
   m_confirm_button = new QPushButton(tr("Confirm"));
   auto* cancel_button = new QPushButton(tr("Cancel"));
@@ -139,9 +140,9 @@ void DualShockUDPClientCalibrationDialog::CommitCalibration()
       {
         if (k == CALIBRATION_INDEX)
         {
-          server_info[k] = fmt::format(
-              "({},{},{},{})", m_min_x->text().toStdString(), m_min_y->text().toStdString(),
-              m_max_x->text().toStdString(), m_max_y->text().toStdString());
+          server_info[k] = fmt::format("({},{},{},{})", m_min_x->text().toStdString(),
+                                       m_min_y->text().toStdString(), m_max_x->text().toStdString(),
+                                       m_max_y->text().toStdString());
         }
         new_server_info += server_info[k];
         if (k + 1 != server_info.size())

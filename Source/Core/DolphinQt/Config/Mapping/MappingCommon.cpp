@@ -14,8 +14,8 @@
 #include <QTimer>
 
 #include "DolphinQt/QtUtils/BlockUserInputFilter.h"
-#include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControlReference/ControlReference.h"
+#include "InputCommon/ControllerEmu/ControllerEmu.h"
 
 #include "Common/Thread.h"
 

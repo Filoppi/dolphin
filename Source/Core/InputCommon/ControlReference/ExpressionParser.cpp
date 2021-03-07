@@ -19,9 +19,9 @@
 #include "Common/Common.h"
 #include "Common/StringUtil.h"
 
-#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControlReference/FunctionExpression.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 namespace ciface::ExpressionParser
 {

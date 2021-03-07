@@ -10,11 +10,11 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QScreen>
 #include <QTabWidget>
 #include <QTimer>
-#include <QScreen>
-#include <QWindow>
 #include <QVBoxLayout>
+#include <QWindow>
 
 #include "Core/Core.h"
 

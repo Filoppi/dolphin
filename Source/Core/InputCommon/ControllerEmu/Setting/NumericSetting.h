@@ -10,8 +10,8 @@
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
 #include "Common/IniFile.h"
-#include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControlReference/ControlReference.h"
+#include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
 namespace ControllerEmu
@@ -130,7 +130,7 @@ public:
       SetValue(m_default_value);
     }
   }
-  
+
   void SaveToIni(IniFile::Section& section, const std::string& group_name) const override
   {
     if (IsSimpleValue())
