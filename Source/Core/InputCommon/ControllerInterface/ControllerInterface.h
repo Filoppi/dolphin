@@ -47,7 +47,7 @@ public:
   ControllerInterface() : m_is_init(false) {}
   void Initialize(const WindowSystemInfo& wsi);
   void ChangeWindow(void* hwnd, bool is_exit = false);
-  void RefreshDevices();
+  void RefreshDevices(bool because_of_window_change = false);
   void Shutdown();
   void AddDevice(std::shared_ptr<ciface::Core::Device> device);
   // Removes all the devices the function returns true to

@@ -28,11 +28,14 @@ static const struct
 
 // Prevent duplicate keyboard/mouse devices. Modified by more threads.
 static std::atomic<bool> s_keyboard_mouse_exists = false;
+static HWND s_hwnd;
 
 void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
 {
   if (s_keyboard_mouse_exists)
     return;
+
+  s_hwnd = hwnd;
 
   // Mouse and keyboard are a combined device, to allow shift+click and stuff
   // if that's dumb, I will make a VirtualDevice class that just uses ranges of inputs/outputs from
@@ -60,7 +63,7 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
       SUCCEEDED(mo_device->SetCooperativeLevel(nullptr, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND)))
   {
     // The device is recreated with a new window handle when we change main window
-    g_controller_interface.AddDevice(std::make_shared<KeyboardMouse>(kb_device, mo_device, hwnd));
+    g_controller_interface.AddDevice(std::make_shared<KeyboardMouse>(kb_device, mo_device));
     return;
   }
 
@@ -70,6 +73,11 @@ void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd)
     kb_device->Release();
   if (mo_device)
     mo_device->Release();
+}
+
+void SetKeyboardMouseWindow(HWND hwnd)
+{
+  s_hwnd = hwnd;
 }
 
 KeyboardMouse::~KeyboardMouse()
@@ -85,16 +93,16 @@ KeyboardMouse::~KeyboardMouse()
 }
 
 KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
-                             const LPDIRECTINPUTDEVICE8 mo_device, HWND hwnd)
-    : m_kb_device(kb_device), m_mo_device(mo_device), m_hwnd(hwnd), m_state_in()
+                             const LPDIRECTINPUTDEVICE8 mo_device)
+    : m_kb_device(kb_device), m_mo_device(mo_device), m_state_in()
 {
   s_keyboard_mouse_exists = true;
 
   if (FAILED(m_kb_device->Acquire()))
     WARN_LOG_FMT(CONTROLLERINTERFACE,
-                 "Keyboard device failed to be aquired (we will retry later on)");
+                 "Keyboard device failed to be acquired (we will retry later on)");
   if (FAILED(m_mo_device->Acquire()))
-    WARN_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to be aquired (we will retry later on)");
+    WARN_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to be acquired (we will retry later on)");
 
   // KEYBOARD
   // add keys
@@ -138,11 +146,11 @@ void KeyboardMouse::UpdateCursorInput()
 
   // Get the cursor position relative to the upper left corner of the current window
   // (separate or render to main)
-  ScreenToClient(m_hwnd, &point);
+  ScreenToClient(s_hwnd, &point);
 
   // Get the size of the current window (in my case Rect.top and Rect.left was zero).
   RECT rect;
-  GetClientRect(m_hwnd, &rect);
+  GetClientRect(s_hwnd, &rect);
 
   // Width and height are the size of the rendering window. They could be 0
   const auto win_width = std::max(rect.right - rect.left, 1l);
@@ -165,7 +173,7 @@ void KeyboardMouse::UpdateInput()
       kb_hr = m_kb_device->GetDeviceState(sizeof(m_state_in.keyboard), &m_state_in.keyboard);
     else
       INFO_LOG_FMT(CONTROLLERINTERFACE,
-                   "Keyboard device failed to be re-aquired, we will try to again");
+                   "Keyboard device failed to be re-acquired, we will try to again");
   }
 
   UpdateCursorInput();
@@ -184,7 +192,7 @@ void KeyboardMouse::UpdateInput()
       mo_hr = m_mo_device->GetDeviceState(sizeof(tmp_mouse), &tmp_mouse);
     else
       INFO_LOG_FMT(CONTROLLERINTERFACE,
-                   "Mouse device failed to be re-aquired, we will try to again");
+                   "Mouse device failed to be re-acquired, we will try to again");
   }
   if (SUCCEEDED(mo_hr))
   {
@@ -211,6 +219,11 @@ std::string KeyboardMouse::GetSource() const
 int KeyboardMouse::GetSortPriority() const
 {
   return 5;
+}
+
+bool KeyboardMouse::IsVirtualDevice() const
+{
+  return true;
 }
 
 // names

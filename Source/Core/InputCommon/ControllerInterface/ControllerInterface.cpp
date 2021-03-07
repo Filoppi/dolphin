@@ -115,14 +115,35 @@ void ControllerInterface::ChangeWindow(void* hwnd, bool is_exit)
   
   if (is_exit)  // No need to re-add devices
     ClearDevices();
-  else  // We could only repupulate devices that depend on the window but it's not that simple
-    RefreshDevices();
+  else
+    RefreshDevices(true);
 }
 
-void ControllerInterface::RefreshDevices()
+void ControllerInterface::RefreshDevices(bool because_of_window_change)
 {
   if (!m_is_init)
     return;
+
+#ifdef CIFACE_USE_WIN32
+#ifndef CIFACE_USE_XLIB
+#ifndef CIFACE_USE_OSX
+  if (because_of_window_change)
+  {
+    m_is_populating_devices.fetch_add(1);
+
+    std::lock_guard lk(m_devices_mutex);
+
+    // No need to do anything else in this case.
+    // Only (Win32) DInput needs the window handle to be updated.
+    ciface::Win32::ChangeWindow(m_wsi.render_window);
+
+    if (m_is_populating_devices.fetch_sub(1) == 1)
+      InvokeDevicesChangedCallbacks();
+    return;
+  }
+#endif
+#endif
+#endif
 
   m_is_populating_devices.fetch_add(1);
 
@@ -341,7 +362,7 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
     any_removed = m_devices.size() != prev_size;
   }
 
-  if (!m_is_populating_devices && any_removed)
+  if (any_removed && !m_is_populating_devices)
     InvokeDevicesChangedCallbacks();
 }
 
