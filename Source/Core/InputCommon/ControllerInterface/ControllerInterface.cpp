@@ -279,6 +279,7 @@ void ControllerInterface::ClearDevices()
     for (const auto& d : m_devices)
       d->ResetOutput();
 
+    // Devices will still be alive after this: there are shared ptrs around the code holding them
     m_devices.clear();
   }
 
@@ -411,14 +412,15 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
   if (!m_is_init)
     return;
 
-  // No need to clean s_input_channels_delta_seconds and the others
+  ciface::InputChannel prev_input_channel = tls_input_channel;
   tls_input_channel = input_channel;
 
   std::lock_guard lk(m_devices_mutex);
 
   if (running)
   {
-    s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
+    // No need to clean s_input_channels_delta_seconds and the others
+    s_input_channels_last_update[u8(input_channel)] = Clock::now();
 
     for (auto& d : m_devices)
     {
@@ -435,6 +437,8 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
       d->ResetOutput();
     }
   }
+
+  tls_input_channel = prev_input_channel;
 }
 
 void ControllerInterface::SetAspectRatioAdjustment(float value)
