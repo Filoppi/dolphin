@@ -169,7 +169,7 @@ void HotkeyScheduler::Run()
         config = Wiimote::GetConfig();
         for (int i = 0; i < config->GetControllersNum(); ++i)
         {
-          if (WiimoteCommon::GetSource(unsigned int(i)) == WiimoteSource::Emulated)
+          if (WiimoteCommon::GetSource((unsigned int)(i)) == WiimoteSource::Emulated)
             config->GetController(i)->CacheInput();
         }
       }
