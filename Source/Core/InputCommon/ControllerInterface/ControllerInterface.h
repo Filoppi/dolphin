@@ -60,7 +60,7 @@ public:
 
   void UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
                    double target_delta_seconds = 0.0);
-  void Reset(ciface::InputChannel input_channel);
+  void SetChannelRunning(ciface::InputChannel input_channel, bool running);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
   // Used to fit mouse cursor inputs to the relevant region of the render window.
