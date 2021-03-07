@@ -312,6 +312,7 @@ void CursorIndicator::Draw()
   // it's not a big deal, being UI only.
   const auto adj_coord = m_cursor_group.GetState(true);
 
+  // TODO: the calibration widget makes no sense when the cursor is in relative mode (it turns red)
   DrawReshapableInput(m_cursor_group, CURSOR_TV_COLOR,
                       adj_coord.IsVisible() ?
                           std::make_optional(Common::DVec2(adj_coord.x, adj_coord.y)) :
