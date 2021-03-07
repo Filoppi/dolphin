@@ -238,11 +238,11 @@ public:
   // an emulation frame, (e.g. the attached devices can change at any time, or you
   // could be editing the expression), but reading from them is always safe.
   [[nodiscard]] static RecursiveMutexCountedLockGuard GetStateLock();
-  // Prints an error in Debug only
+  // Prints an error in Debug only. There are a bunch of these over the code to avoid bad usage.
   static void EnsureStateLock();
-  //To review: usage on OutputReference::SetState()? As it could end up reading inputs as well
   // This needs to be called when updating devices inputs as they might otherwise be read by
-  // ControlReferences expressions GetState() while being written.
+  // ControlReferences expressions GetState() while being written. This isn't necessary on
+  // OutputReference::SetState() because we've made sure they can't read inputs.
   [[nodiscard]] static std::unique_lock<std::recursive_mutex> GetDevicesInputLock();
 
   std::vector<std::unique_ptr<ControlGroup>> groups;
@@ -271,7 +271,12 @@ public:
   }
 
 protected:
-  // TODO: Wiimote attachment has its own member that isn't being used.
+  // TODO: Wiimote attachments actually end up using their parent controller value for this,
+  // so theirs won't be used (and thus shouldn't even exist).
+  // Note that these are never cleaned, even after they aren't referenced anymore.
+  // TODO: we could mark all of them as unreferenced before calling UpdateReferences(),
+  // then actually check which ones are still used and remove the others.
+  // We could also use a way of resetting their value directly.
   ciface::ExpressionParser::ControlEnvironment::VariableContainer m_expression_vars;
 
   void UpdateReferences(ciface::ExpressionParser::ControlEnvironment& env);
