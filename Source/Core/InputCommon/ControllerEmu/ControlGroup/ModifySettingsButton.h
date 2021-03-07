@@ -20,8 +20,8 @@ public:
 
   void GetState();
 
-  const std::vector<bool>& isSettingToggled() const;
-  const std::vector<bool>& getSettingsModifier() const;
+  const std::vector<bool>& IsSettingToggled() const;
+  const std::vector<bool>& GetSettingsModifier() const;
 
 private:
   std::vector<bool> threshold_exceeded;  // internal calculation (if "state" was above threshold)

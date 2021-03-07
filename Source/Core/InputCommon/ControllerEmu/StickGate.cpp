@@ -281,7 +281,8 @@ void ReshapableInput::SaveConfig(IniFile::Section* section, const std::string& d
 }
 
 ReshapableInput::ReshapeData ReshapableInput::Reshape(ControlState x, ControlState y,
-                                                      ControlState modifier, ControlState clamp)
+                                                      ControlState modifier,
+                                                      ControlState clamp) const
 {
   x -= m_center.x;
   y -= m_center.y;
