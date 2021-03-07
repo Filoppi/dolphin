@@ -40,6 +40,9 @@ public:
 
   MappingWindow* GetParent() const;
 
+  bool GetBlockUpdate() const { return m_block_update; }
+  void SetBlockUpdate(bool block_update) { m_block_update = block_update; }
+
   virtual void LoadSettings() = 0;
   virtual void SaveSettings() = 0;
   virtual InputConfig* GetConfig() = 0;
