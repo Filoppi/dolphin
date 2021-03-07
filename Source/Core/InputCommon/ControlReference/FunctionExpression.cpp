@@ -295,15 +295,11 @@ private:
   }
 };
 
-//To test all functions. smooth/onTap/pulse/timer are broken. test input channels. Add getAspectRatio()?
-//cache(`Cursor Y+`, hasFocus())
-//hotkey manager, set output filter is broken
+//To test cache(`Cursor Y+`, hasFocus())
 //Test input focus code with pause on unfocus.
 //test single output, wiimote battery focus
-//output mutex and reset outputs on pause
 //Add missing _trans("")
 //prefilled array (???)
-//To merge with master
 
 // usage: interval(delay_frames, duration_frames)
 class IntervalExpression : public FunctionExpression
@@ -1038,6 +1034,7 @@ private:
 };
 
 // usage: cache(expression, condition)
+// Note that resetting/releasing the condition input does not reset the cached value
 class CacheExpression : public FunctionExpression
 {
 private:
@@ -1132,7 +1129,9 @@ private:
 };
 
 // usage: onTap(input, seconds, taps = 2)
-// Use real world time for this one as it makes more sense
+// Use real world time for this one as it makes more sense.
+// It would be nice to add a setting to restart the detection time on every tap,
+// for more flexibility
 class OnTapExpression : public FunctionExpression
 {
 private:
@@ -1147,8 +1146,8 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Double+ tap detection within the specified time. Keeps returning 1 until you "
-                  "release the last tap");
+    return _trans("Double+ tap detection within the specified time from the first tap. Keeps "
+                  "returning 1 until you release the last tap");
   }
 
   ControlState GetValue() const override
@@ -1160,8 +1159,7 @@ private:
     const ControlState input = GetArg(0).GetValue();
     const ControlState seconds = GetArg(1).GetValue();
 
-    //To review >/>=
-    const bool is_time_up = elapsed > seconds;
+    const bool is_time_up = elapsed >= seconds;
 
     const u32 desired_taps =
         GetArgCount() == 3 ? u32(std::max(GetArg(2).GetValue() + 0.5, 0.0)) : 2;
@@ -1194,8 +1192,8 @@ private:
   mutable Clock::time_point m_start_time = Clock::now();
 };
 
-//To explain about shared_state, expecting to be a VariableExpression
-// usage: toRelative(input, speed = 0, [max_abs_value], [shared_state])
+//To review this in general, it breaks with a button
+// usage: toRelative(input, speed = 0, max_abs_value = 1, [shared_state])
 class ToRelativeExpression : public FunctionExpression
 {
 private:
@@ -1205,13 +1203,14 @@ private:
     if (args.size() >= 1 && args.size() <= 4)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, speed = 0, [max_abs_value], [shared_state]"};
+      return ExpectedArguments{"input, speed = 0, max_abs_value = 1, [shared_state]"};
   }
 
   const char* GetDescription(bool for_input) const override
   {
     return _trans(
-        "Returns the relative change of an input, clamped by speed per second if it's > 0");
+        "Returns the relative change of an input, clamped by speed per second if it's > 0. You can "
+        "add a shared state with $unique_name so you can link functions from multiple mappings");
   }
 
   ControlState GetValue() const override
@@ -1464,9 +1463,11 @@ private:
   {
     // This will return 1 when the emulation is not running, wether in the UI or not
     return 1.0;
-    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic). Maybe we don't need this anymore...
+    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic).
   }
 };
+
+// TODO: getAspectRation() function
 
 // usage: timeToInputFrames(seconds)
 class TimeToInputFramesExpression : public FunctionExpression
@@ -1545,8 +1546,8 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans("Can be used to cache inputs values on focus loss, or to trigger inputs the "
-                  "window loses focus, like pausing "
-                  "the game pause or changing the emulation speed");
+                  "window loses focus, like pausing the game pause or changing the emulation speed."
+                  " Only works on the emulation window.");
   }
 
   Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
@@ -1734,7 +1735,6 @@ u32 FunctionExpression::GetArgCount() const
   return u32(m_args.size());
 }
 
-//To review: insane?
 void FunctionExpression::SetValue(ControlState value)
 {
   // By default just pass along all the values and ignore the function as
