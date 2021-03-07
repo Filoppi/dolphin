@@ -607,15 +607,20 @@ void IOWindow::AddFunction(std::string function_name)
                                  Qt::ToolTipRole);
 }
 
+// This is called once on init. It's also ready for being called at any time
+// if the config changes externally, but it's not linked to that yet.
 void IOWindow::ConfigChanged()
 {
   const QSignalBlocker blocker(this);
-  const auto lock = ControllerEmu::EmulatedController::GetStateLock();;
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
 
   if (m_numeric_setting && m_numeric_setting->IsSimpleValue())
     m_numeric_setting->SetExpressionFromValue();
 
   m_original_expression = m_reference->GetExpression();
+
+  m_original_range = m_reference->range;
+  OnRangeChanged();
 
   // ensure m_parse_text is in the right state
   UpdateExpression(m_reference->GetExpression(), UpdateMode::Force);
@@ -634,10 +639,6 @@ void IOWindow::ConfigChanged()
     }
   }
   m_expression_text->moveCursor(QTextCursor::End, QTextCursor::MoveAnchor);
-  {
-    m_range = m_reference->range;
-    OnRangeChanged();
-  }
 
   if (m_devq.ToString().empty())
     m_devq = m_controller->GetDefaultDevice();
@@ -710,10 +711,10 @@ void IOWindow::ConnectWidgets()
 
   // revert the expression and range changes when the window closes without using the OK button
   connect(this, &IOWindow::finished, [this] {
+    // Lock just to be sure, range is atomic. Also it can't have changed if we are an input setting.
+    const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+    m_reference->range = m_original_range;
     UpdateExpression(m_original_expression);
-  });
-  connect(this, &IOWindow::accepted, [this] {
-    SaveRange();
   });
 }
 
@@ -742,10 +743,13 @@ void IOWindow::OnDialogButtonPressed(QAbstractButton* button)
     return;
   }
 
-  const auto lock = ControllerEmu::EmulatedController::GetStateLock();;
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+
+  // Update the original expression and range as they will be set back when this widget closes.
+
+  m_original_range = m_reference->range;
 
   UpdateExpression(m_expression_text->toPlainText().toStdString());
-  // Update the original expression as it will be set back when this widget closes.
   // Numeric setting string needs to be reconstructed or it will break the state.
   if (m_numeric_setting && m_numeric_setting->IsSimpleValue())
     m_original_expression = m_numeric_setting->GetExpressionFromValue();
@@ -794,14 +798,17 @@ void IOWindow::OnTestResultsButtonPressed()
 
 void IOWindow::OnUIRangeChanged(int value)
 {
-  m_range = static_cast<ControlState>(value) / RANGE_PERCENTAGE;
+  // Lock just to be sure, range is atomic
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+  m_reference->range = static_cast<ControlState>(value) / RANGE_PERCENTAGE;
   OnRangeChanged();
 }
 
 void IOWindow::OnRangeChanged()
 {
-  int qt_value = int(std::round(m_range * RANGE_PERCENTAGE));  // Needed or it loses accuracy
-  int slider_range = std::max(m_range_slider->maximum(), std::abs(qt_value));
+  const int qt_value =
+      int(std::round(m_reference->range * RANGE_PERCENTAGE));  // Needed or it loses accuracy
+  const int slider_range = std::max(m_range_slider->maximum(), std::abs(qt_value));
   // Increase the range of the slider if necessary, we don't want any limts
   m_range_slider->setRange(-slider_range, slider_range);
   if (slider_range > 1000)  // Hide ticks above 1000 or it becomes too expensive to render
@@ -810,12 +817,6 @@ void IOWindow::OnRangeChanged()
   const QSignalBlocker blocker_range_slider(m_range_slider);
   m_range_spinbox->setValue(qt_value);
   m_range_slider->setValue(qt_value);
-}
-
-void IOWindow::SaveRange()
-{
-  if (m_type != Type::InputSetting)
-    m_reference->range = m_range;  // GetStateLock() was already called, and range is atomic anyway
 }
 
 void IOWindow::UpdateOptionList()
@@ -897,7 +898,7 @@ void IOWindow::UpdateDeviceList()
 // it will use whatever expression we have in the editor, not the previous one
 void IOWindow::UpdateExpression(std::string new_expression, UpdateMode mode)
 {
-  const auto lock = ControllerEmu::EmulatedController::GetStateLock();;
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
   // Always force if it's a numeric setting or an empty expression wouldn't be simplified to 0
   if (mode != UpdateMode::Force && new_expression == m_reference->GetExpression() &&
       !m_numeric_setting)
