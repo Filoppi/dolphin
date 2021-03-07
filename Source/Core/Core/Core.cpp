@@ -247,17 +247,6 @@ bool Init(std::unique_ptr<BootParameters> boot, const WindowSystemInfo& wsi)
   return true;
 }
 
-static void ResetRumble()
-{
-#if defined(__LIBUSB__)
-  GCAdapter::ResetRumble();
-#endif
-  if (!Pad::IsInitialized())
-    return;
-  for (int i = 0; i < 4; ++i)
-    Pad::ResetRumble(i);
-}
-
 // Called from GUI thread
 void Stop()  // - Hammertime!
 {
@@ -425,14 +414,12 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   const SConfig& core_parameter = SConfig::GetInstance();
   if (s_on_state_changed_callback)
     s_on_state_changed_callback(State::Starting);
+
   Common::ScopeGuard flag_guard{[] {
     s_is_booting.Clear();
     s_is_started = false;
     s_is_stopping = false;
     s_wants_determinism = false;
-
-    g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
-    g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
 
     if (s_on_state_changed_callback)
       s_on_state_changed_callback(State::Uninitialized);
@@ -464,6 +451,9 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     Pad::LoadConfig();
     Keyboard::LoadConfig();
   }
+
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, true);
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, true);
 
   const std::optional<std::string> savestate_path = boot->savestate_path;
   const bool delete_savestate = boot->delete_savestate;
@@ -497,6 +487,9 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   }
 
   Common::ScopeGuard controller_guard{[init_controllers, init_wiimotes] {
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
+    g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
+
     if (!init_controllers)
       return;
 
@@ -508,7 +501,9 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
 
     FreeLook::Shutdown();
 
-    ResetRumble();
+#if defined(__LIBUSB__)
+    GCAdapter::ResetRumble();
+#endif
 
     Keyboard::Shutdown();
     Pad::Shutdown();
@@ -665,13 +660,15 @@ void SetState(State state)
     g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
     g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
     Wiimote::Pause();
-    ResetRumble();
+#if defined(__LIBUSB__)
+    GCAdapter::ResetRumble();
+#endif
     break;
   case State::Running:
-    CPU::EnableStepping(false);
-    Wiimote::Resume();
     g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, true);
     g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, true);
+    CPU::EnableStepping(false);
+    Wiimote::Resume();
     break;
   default:
     PanicAlertFmt("Invalid state");
@@ -789,7 +786,13 @@ static bool PauseAndLock(bool do_lock, bool unpause_on_unlock)
   // (s_efbAccessRequested).
   Fifo::PauseAndLock(do_lock, false);
 
-  ResetRumble();
+  const bool running = do_lock ? false : unpause_on_unlock;
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, running);
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, running);
+
+#if defined(__LIBUSB__)
+  GCAdapter::ResetRumble();
+#endif
 
   // CPU is unlocked last because CPU::PauseAndLock contains the synchronization
   // mechanism that prevents CPU::Break from racing.
