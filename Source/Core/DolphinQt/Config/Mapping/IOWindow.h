@@ -73,7 +73,7 @@ public:
                     ControlReference* ref, Type type, const QString& name,
                     ControllerEmu::NumericSettingBase* numeric_setting = nullptr);
 
-  std::shared_ptr<ciface::Core::Device> GetSelectedDevice();
+  std::shared_ptr<ciface::Core::Device> GetSelectedDevice() const;
 
 private:
   void CreateMainLayout();
@@ -85,7 +85,8 @@ private:
   void OnDialogButtonPressed(QAbstractButton* button);
   void OnDeviceChanged();
   void OnDetectButtonPressed();
-  void OnTestButtonPressed();
+  void OnTestSelectedButtonPressed();
+  void OnTestResultsButtonPressed();
   void OnUIRangeChanged(int range);
   void OnRangeChanged();
 
@@ -127,7 +128,8 @@ private:
   QPushButton* m_detect_button;
 
   // Output actions
-  QPushButton* m_test_button;
+  QPushButton* m_test_selected_button;
+  QPushButton* m_test_results_button;
 
   // TextArea
   QPlainTextEdit* m_expression_text;

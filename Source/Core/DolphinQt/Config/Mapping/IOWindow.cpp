@@ -272,7 +272,7 @@ IOWindow::IOWindow(MappingWidget* parent, ControllerEmu::EmulatedController* con
   ConnectWidgets();
 }
 
-std::shared_ptr<ciface::Core::Device> IOWindow::GetSelectedDevice()
+std::shared_ptr<ciface::Core::Device> IOWindow::GetSelectedDevice() const
 {
   return m_selected_device;
 }
@@ -286,8 +286,8 @@ void IOWindow::CreateMainLayout()
   m_help_button = new QPushButton(tr("Help"));
   m_select_button = new QPushButton(tr("Add Selected"));
   m_detect_button = new QPushButton(tr("Detect"), this);
-  // A button to test the currently selected output isn't really needed
-  m_test_button = new QPushButton(tr("Test Results"), this);
+  m_test_selected_button = new QPushButton(tr("Test Selected"), this);
+  m_test_results_button = new QPushButton(tr("Test Results"), this);
   m_button_box = new QDialogButtonBox();
   m_clear_button = new QPushButton(tr("Clear"));
   m_range_slider = new QSlider(Qt::Horizontal);
@@ -295,6 +295,7 @@ void IOWindow::CreateMainLayout()
   m_focus_label = new QLabel();
 
   m_select_button->setEnabled(false);
+  m_test_selected_button->setEnabled(false);
 
   m_detect_button->setToolTip(
       tr("Detect input from the current device.\nNote that some inputs can't be detected."));
@@ -503,13 +504,15 @@ void IOWindow::CreateMainLayout()
 
   if (m_type == Type::Input || m_type == Type::InputSetting)
   {
-    m_test_button->hide();
+    m_test_selected_button->hide();
+    m_test_results_button->hide();
     button_vbox->addWidget(m_detect_button);
   }
   else
   {
     m_detect_button->hide();
-    button_vbox->addWidget(m_test_button);
+    button_vbox->addWidget(m_test_selected_button);
+    button_vbox->addWidget(m_test_results_button);
   }
 
   button_vbox->addWidget(m_operators_combo);
@@ -653,14 +656,19 @@ void IOWindow::ConnectWidgets()
 {
   connect(m_select_button, &QPushButton::clicked, [this] { AppendSelectedOption(); });
   connect(m_option_list, &QTableWidget::cellDoubleClicked, [this] { AppendSelectedOption(); });
-  connect(m_option_list, &QTableWidget::itemSelectionChanged,
-          [this] { m_select_button->setEnabled(m_option_list->currentRow() >= 0); });
+  connect(m_option_list, &QTableWidget::itemSelectionChanged, [this] {
+    const bool any_selected = m_option_list->currentRow() >= 0;
+    m_test_selected_button->setEnabled(any_selected);
+    m_select_button->setEnabled(any_selected);
+  });
   
-  //To explain that some axes are relative? And specify that gc refresh input rate is variable and that gc has 2 inputs per video updt
+  //To use dolphin tooltips if possible
   connect(m_help_button, &QPushButton::clicked, [this] {
     QString help_tooltip =
         tr("You can either simply bind an %1 or use functions\nand operators to achieve more "
-           "complex results.\nYou can bind controls from multiple devices.\nSee more "
+           "complex results.\nYou can bind controls from multiple devices.\nSome inputs are "
+           "relative and might need to be converted\nto a rate or smoothed over time to be "
+           "correctly mapped.\nSee more "
            "at https://wiki.dolphin-emu.org/index.php?title=Input_Syntax")
             .arg(m_type != Type::Input ? tr("output") : tr("input"));
     QToolTip::showText(QCursor::pos(), help_tooltip);
@@ -669,7 +677,8 @@ void IOWindow::ConnectWidgets()
   connect(&Settings::Instance(), &Settings::DevicesChanged, this, &IOWindow::UpdateDeviceList);
 
   connect(m_detect_button, &QPushButton::clicked, this, &IOWindow::OnDetectButtonPressed);
-  connect(m_test_button, &QPushButton::clicked, this, &IOWindow::OnTestButtonPressed);
+  connect(m_test_selected_button, &QPushButton::clicked, this, &IOWindow::OnTestSelectedButtonPressed);
+  connect(m_test_results_button, &QPushButton::clicked, this, &IOWindow::OnTestResultsButtonPressed);
 
   connect(m_button_box, &QDialogButtonBox::clicked, this, &IOWindow::OnDialogButtonPressed);
   connect(m_devices_combo, &QComboBox::currentTextChanged, this, &IOWindow::OnDeviceChanged);
@@ -768,9 +777,19 @@ void IOWindow::OnDetectButtonPressed()
     m_option_list->setCurrentItem(list[0]);
 }
 
-void IOWindow::OnTestButtonPressed()
+void IOWindow::OnTestSelectedButtonPressed()
 {
-  MappingCommon::TestOutput(m_test_button, static_cast<OutputReference*>(m_reference));
+  if (m_option_list->currentRow() < 0 || GetSelectedDevice() == nullptr)
+    return;
+
+  MappingCommon::TestOutput(
+      m_test_selected_button, GetSelectedDevice().get(),
+      m_option_list->item(m_option_list->currentRow(), 0)->text().toStdString());
+}
+
+void IOWindow::OnTestResultsButtonPressed()
+{
+  MappingCommon::TestOutput(m_test_results_button, static_cast<OutputReference*>(m_reference));
 }
 
 void IOWindow::OnUIRangeChanged(int value)
