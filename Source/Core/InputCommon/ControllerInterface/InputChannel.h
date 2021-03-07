@@ -8,7 +8,7 @@
 
 namespace ciface
 {
-// Assumed to be u8
+// Assumed to be u8. Actually used for output as well
 enum class InputChannel : u8
 {
   SerialInterface,  // GC Controllers

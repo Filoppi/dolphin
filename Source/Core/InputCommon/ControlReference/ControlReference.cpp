@@ -329,7 +329,9 @@ void InputReference::UpdateState()
 void OutputReference::SetState(ControlState state)
 {
   ControllerEmu::EmulatedController::EnsureStateLock();
-  // If "filtered", update it to 0 (the reseting value), we wouldn't want the old state to persist
+  // If "filtered", update it to 0 (the reseting value), we wouldn't want the old state to persist.
+  // There isn't an event when the filter result would change so it will only start taking effect
+  // on the following set.
   if (!Filter())
     state = 0.0;
   if (m_parsed_expression)
