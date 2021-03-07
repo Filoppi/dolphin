@@ -136,7 +136,7 @@ void MappingButton::Clear()
 void MappingButton::UpdateIndicator()
 {
   QFont f = m_parent->font();
-  
+
   // This won't detect all devices unless they have their path in front of them.
   // We don't want to show the results here if we are editing the mapping,
   // as it would show the previous expression highlighting based on the new (pending)

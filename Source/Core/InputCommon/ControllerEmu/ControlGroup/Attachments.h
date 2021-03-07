@@ -41,7 +41,7 @@ private:
   // Note that this being a numeric setting, the input won't require focus unless specified.
   NumericSetting<int> m_selection_setting = {
       &m_selection_value, {""}, 0, 0, WiimoteEmu::ExtensionNumber::MAX - 1};
-  
+
   std::vector<std::unique_ptr<EmulatedController>> m_attachments;
 };
 }  // namespace ControllerEmu

@@ -209,7 +209,7 @@ void RenderWidget::showFullScreen()
 void RenderWidget::SetCursorLocked(bool locked, bool follow_aspect_ratio)
 {
   // It seems like QT doesn't scale the window frame correctly with some DPIs
-  // so it might happen that the locked cursor can be on the frame of the window, 
+  // so it might happen that the locked cursor can be on the frame of the window,
   // being able to resize it, but that is a minor problem.
   // As a hack, if necessary, we could always scale down the size by 2 pixel, to a min of 1 given
   // that the size can be 0 already. We probably shouldn't scale axes already scaled by aspect ratio

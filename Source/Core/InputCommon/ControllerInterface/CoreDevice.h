@@ -5,12 +5,12 @@
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <map>
 #include <vector>
 
 #include "Common/CommonTypes.h"
@@ -132,13 +132,13 @@ public:
     virtual ControlState GetState() const = 0;
 
     Input* ToInput() override { return this; }
-	
+
     // Overridden by CombinedInput,
     // so hotkey logic knows Ctrl, L_Ctrl, and R_Ctrl are the same,
     // and so input detection can return the parent name.
     virtual bool IsChild(const Input*) const { return false; }
 
-protected:
+  protected:
     InputChannel GetCurrentInputChannel() const;
   };
 

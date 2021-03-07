@@ -7,10 +7,9 @@
 #include <memory>
 #include <vector>
 
+#include <QFormLayout>
 #include <QString>
-#include <QFormLayout>
 #include <QWidget>
-#include <QFormLayout>
 
 constexpr int WIDGET_MAX_WIDTH = 112;
 

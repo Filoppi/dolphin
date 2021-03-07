@@ -40,10 +40,10 @@ ControllerInterface g_controller_interface;
 
 using Clock = std::chrono::steady_clock;
 
-// We need to save which input channel we are in by thread, so we can access the correct input update values
-// in different threads by input channel.
-// We start from InputChannel::Host on all threads as hotkeys are updated from a worker thread,
-// but UI can read from the main thread. This will never interfere with game threads.
+// We need to save which input channel we are in by thread, so we can access the correct input
+// update values in different threads by input channel. We start from InputChannel::Host on all
+// threads as hotkeys are updated from a worker thread, but UI can read from the main thread. This
+// will never interfere with game threads.
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
 static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
@@ -112,7 +112,7 @@ void ControllerInterface::ChangeWindow(void* hwnd, bool is_exit)
 
   // This shouldn't use render_surface so no need to update it.
   m_wsi.render_window = hwnd;
-  
+
   if (is_exit)  // No need to re-add devices
     ClearDevices();
   else
@@ -148,11 +148,12 @@ void ControllerInterface::RefreshDevices(bool because_of_window_change)
   m_is_populating_devices.fetch_add(1);
 
   // We lock m_devices_mutex here to make everything simpler.
-  // Multiple devices classes have their own "hotplug" thread, and can add/remove devices at any time,
-  // while actual writes to "m_devices" are safe, the order in which they happen is not.
-  // That means a thread could be adding devices while we are removing them, or removing them as we are populating them.
-  // The best way of approaching this (for performance) would be to individually implement this in every devices class,
-  // but it's fairly complicated and this should never hang the emulation thread anyway.
+  // Multiple devices classes have their own "hotplug" thread, and can add/remove devices at any
+  // time, while actual writes to "m_devices" are safe, the order in which they happen is not. That
+  // means a thread could be adding devices while we are removing them, or removing them as we are
+  // populating them. The best way of approaching this (for performance) would be to individually
+  // implement this in every devices class, but it's fairly complicated and this should never hang
+  // the emulation thread anyway.
   m_devices_mutex.lock();
 
   // Make sure shared_ptr<Device> objects are released before repopulating.
@@ -348,16 +349,15 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
   bool any_removed;
   {
     std::lock_guard lk(m_devices_mutex);
-    auto it = std::remove_if(
-        m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
-          if (callback(dev.get()))
-          {
-            dev->ResetOutput();
-            NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Removed device: {}", dev->GetQualifiedName());
-            return true;
-          }
-          return false;
-        });
+    auto it = std::remove_if(m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
+      if (callback(dev.get()))
+      {
+        dev->ResetOutput();
+        NOTICE_LOG_FMT(CONTROLLERINTERFACE, "Removed device: {}", dev->GetQualifiedName());
+        return true;
+      }
+      return false;
+    });
     size_t prev_size = m_devices.size();
     m_devices.erase(it, m_devices.end());
     any_removed = m_devices.size() != prev_size;

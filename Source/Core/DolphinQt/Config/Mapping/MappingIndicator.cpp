@@ -143,7 +143,6 @@ int MappingIndicator::GetUpdateFrequency() const
   return 60;
 }
 
-
 SquareIndicator::SquareIndicator()
 {
   // Additional pixel for border.

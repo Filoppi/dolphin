@@ -102,7 +102,8 @@ KeyboardMouse::KeyboardMouse(const LPDIRECTINPUTDEVICE8 kb_device,
     WARN_LOG_FMT(CONTROLLERINTERFACE,
                  "Keyboard device failed to be acquired (we will retry later on)");
   if (FAILED(m_mo_device->Acquire()))
-    WARN_LOG_FMT(CONTROLLERINTERFACE, "Mouse device failed to be acquired (we will retry later on)");
+    WARN_LOG_FMT(CONTROLLERINTERFACE,
+                 "Mouse device failed to be acquired (we will retry later on)");
 
   // KEYBOARD
   // add keys
@@ -199,7 +200,7 @@ void KeyboardMouse::UpdateInput()
     m_state_in.mouse = tmp_mouse;
     for (unsigned int i = 0; i < m_mouse_axes.size(); ++i)
     {
-      const LONG& axis = (&m_state_in.mouse.lX)[i/2];
+      const LONG& axis = (&m_state_in.mouse.lX)[i / 2];
       m_mouse_axes[i]->UpdateState(axis);
     }
   }

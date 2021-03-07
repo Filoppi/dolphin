@@ -33,7 +33,7 @@ namespace ControllerEmu
 {
 class EmulatedController;
 class NumericSettingBase;
-}
+}  // namespace ControllerEmu
 
 class InputStateLineEdit;
 
