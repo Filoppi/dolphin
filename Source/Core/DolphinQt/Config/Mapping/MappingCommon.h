@@ -29,7 +29,8 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
                          const std::vector<std::string>& device_strings,
                          const ciface::Core::DeviceQualifier& default_device);
 
-void TestOutput(QPushButton* button, ciface::Core::Device* device, std::string output_name);
+void TestOutput(QPushButton* button, ciface::Core::DeviceContainer& device_container,
+                ciface::Core::Device* device, std::string output_name);
 void TestOutput(QPushButton* button, OutputReference* reference);
 
 void RemoveSpuriousTriggerCombinations(std::vector<ciface::Core::DeviceContainer::InputDetection>*);

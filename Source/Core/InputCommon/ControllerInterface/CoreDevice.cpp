@@ -339,6 +339,12 @@ Device::Output* DeviceContainer::FindOutput(std::string_view name, const Device*
   return def_dev->FindOutput(name);
 }
 
+std::unique_lock<std::mutex> DeviceContainer::GetDevicesOutputLock() const
+{
+  std::unique_lock<std::mutex> lock(m_devices_output_mutex);
+  return lock;
+}
+
 bool DeviceContainer::HasConnectedDevice(const DeviceQualifier& qualifier) const
 {
   const auto device = FindDevice(qualifier);

@@ -101,7 +101,8 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
   return BuildExpression(detections, default_device);
 }
 
-void TestOutput(QPushButton* button, ciface::Core::Device* device, std::string output_name)
+void TestOutput(QPushButton* button, ciface::Core::DeviceContainer& device_container,
+                ciface::Core::Device* device, std::string output_name)
 {
   ciface::Core::Device::Output* output = device->FindOutput(output_name);
   if (!output)
@@ -114,11 +115,12 @@ void TestOutput(QPushButton* button, ciface::Core::Device* device, std::string o
   QApplication::processEvents();
 
   {
-    //To review: We need an output lock... (not only here)
+    const auto lock = device_container.GetDevicesOutputLock();
     output->SetState(1.0, button);
   }
   std::this_thread::sleep_for(OUTPUT_TEST_TIME);
   {
+    const auto lock = device_container.GetDevicesOutputLock();
     output->SetState(0.0, button);
   }
 
