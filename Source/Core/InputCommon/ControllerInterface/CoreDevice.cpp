@@ -143,7 +143,7 @@ bool Device::Control::IsMatchingName(std::string_view name) const
 
 void Device::Output::SetState(ControlState state, const void* source_object)
 {
-  if (state == 0.f)
+  if (state == 0)
     m_states.erase(source_object);
   else
     m_states[source_object] = state;  // Add or update the value

@@ -2,6 +2,7 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 
@@ -67,9 +68,17 @@ void ControlReference::UpdateReference(ciface::ExpressionParser::ControlEnvironm
   ControllerEmu::EmulatedController::EnsureStateLock();
   if (m_parsed_expression)
     m_parsed_expression->UpdateReferences(env, IsInput());
+
+  UpdateFocusFlags();
   UpdateBoundCount();
-  // Don't update the state here, let it to it's next natural cycle,
+  // Don't update the state on inputs, let it to it's next natural cycle,
   // as this can be called by any thread at any time.
+  // If we are an output, immediately re-apply the last cached value with the new references
+  // (filtering won't be updated but it doesn't matter).
+  if (!IsInput())
+  {
+    UpdateState();
+  }
 }
 
 void ControlReference::UpdateFocusFlags()
@@ -125,7 +134,12 @@ std::optional<std::string> ControlReference::SetExpression(std::string expr)
   m_parse_status = parse_result.status;
   m_parsed_expression = std::move(parse_result.expr);
 
-  // Update cached values immediately (references are missing for now):
+  // Update input cached values immediately and re-apply outputs.
+  // References are missing for now so this is partially useless but also necessary
+  // for numeric settings simplifications in the UI.
+  // The state of inputs is atomic so it's fine, though some places in the code that read
+  // the cached input might get two different values within the same frame, but that's rare
+  // and innocuous enough to be ignored.
   UpdateFocusFlags();
   UpdateState();
   UpdateBoundCount();
@@ -283,6 +297,7 @@ IgnoreGateInputReference::IgnoreGateInputReference(ControlState range_) : InputR
 OutputReference::OutputReference(ControlState range_) : ControlReference(range_)
 {
   m_cached_focus_flags = u8(Device::FocusFlags::OutputDefault);
+  ResetState();
 }
 
 bool InputReference::IsInput() const
@@ -328,12 +343,38 @@ void InputReference::UpdateState()
 
 void OutputReference::SetState(ControlState state)
 {
-  ControllerEmu::EmulatedController::EnsureStateLock();
-  // If "filtered", update it to 0 (the reseting value), we wouldn't want the old state to persist.
+  // If "filtered", update it to 0 (the resting value), we wouldn't want the old state to persist.
   // There isn't an event when the filter result would change so it will only start taking effect
   // on the following set.
   if (!Filter())
     state = 0.0;
+
+  // Useful for keeping the state after we change the expression and also to allow UI and game
+  // to have different values
+  m_cached_states[u8(g_controller_interface.GetCurrentInputChannel())] = state;
+
+  // It's important to call this even if the cached states are the same as before
+  UpdateState();
+}
+
+void OutputReference::UpdateState()
+{
+  ControllerEmu::EmulatedController::EnsureStateLock();
+  ControlState final_state = 0;
+  // Take the sum of all channels
+  for (u8 i = 0; i < u8(ciface::InputChannel::Max); ++i)
+  {
+    final_state += m_cached_states[i];
+  }
+
   if (m_parsed_expression)
-    m_parsed_expression->SetValue(state * range);
+    m_parsed_expression->SetValue(final_state * range);
+}
+
+void OutputReference::ResetState()
+{
+  for (u8 i = 0; i < u8(ciface::InputChannel::Max); ++i)
+  {
+    m_cached_states[i] = 0;
+  }
 }

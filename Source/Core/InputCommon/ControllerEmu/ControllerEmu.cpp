@@ -99,7 +99,13 @@ void EmulatedController::CacheInput()
   for (auto& ctrlGroup : groups)
   {
     for (auto& control : ctrlGroup->controls)
-      control->control_ref->UpdateState();
+    {
+      // We could easily also cache outputs here, but we don't really want because it's
+      // mostly useless and they'd be one "frame" late (also we'd need to remove the call to
+      // UpdateState() within SetState()).
+      if (control->control_ref->IsInput())
+        control->control_ref->UpdateState();
+    }
 
     for (auto& setting : ctrlGroup->numeric_settings)
       setting->Update();

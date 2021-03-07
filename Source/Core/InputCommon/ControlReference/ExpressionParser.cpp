@@ -308,12 +308,14 @@ public:
     {
       if (is_input)
         m_input = m_device->FindInput(m_qualifier.control_name);
-      else  // Theoretically we should have cached the last set value on previous output and set it here immediately, but in reality it won't make much difference
+      else
         m_output = m_device->FindOutput(m_qualifier.control_name);
     }
 
+    // Reset the old output.
     if (m_output != previous_output && previous_output)
     {
+      const auto lock = g_controller_interface.GetDevicesOutputLock();
       previous_output->SetState(0.0, this);
     }
   }
@@ -322,7 +324,6 @@ public:
 
 private:
   // Keep a shared_ptr to the device so the control pointers don't become invalid.
-  // TODO: just use the devices mutex instead keeping a shared ptr.
   std::shared_ptr<Device> m_device;
   ControlQualifier m_qualifier;
   Device::Input* m_input = nullptr;
