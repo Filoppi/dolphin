@@ -72,8 +72,9 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
   // The button text won't be updated if we don't process events here
   QApplication::processEvents();
 
-  //To review: just close the input gate? Or is this about Qt? Is this time enough?
-  // Avoid that the button press itself is registered as an event
+  // Avoid the input press itself starting as "1/down" in the input detection,
+  // which would then either always or never detect it.
+  // This should always work as input is updated at 60Hz by a different thread.
   Common::SleepCurrentThread(50);
 
   auto detections =
@@ -100,6 +101,30 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
   return BuildExpression(detections, default_device);
 }
 
+void TestOutput(QPushButton* button, ciface::Core::Device* device, std::string output_name)
+{
+  ciface::Core::Device::Output* output = device->FindOutput(output_name);
+  if (!output)
+    return;
+
+  const auto old_text = button->text();
+  button->setText(QStringLiteral("..."));
+
+  // The button text won't be updated if we don't process events here
+  QApplication::processEvents();
+
+  {
+    //To review: We need an output lock... (not only here)
+    output->SetState(1.0, button);
+  }
+  std::this_thread::sleep_for(OUTPUT_TEST_TIME);
+  {
+    output->SetState(0.0, button);
+  }
+
+  button->setText(old_text);
+}
+
 void TestOutput(QPushButton* button, OutputReference* reference)
 {
   // No point in locking the thread if the expression won't do anything
@@ -113,14 +138,15 @@ void TestOutput(QPushButton* button, OutputReference* reference)
   QApplication::processEvents();
 
   {
-    //To review this now with output caching/map (the map should be per thread so that this can be async). We could also easily add a Test Output button for a single control now.
     const auto lock = ControllerEmu::EmulatedController::GetStateLock();
     reference->SetState(1.0);
   }
   // This will hang the UI but it's the simplest way of doing it. Note that the emulation
-  // could still change the state of this output during the sleep, to avoid that, we'd need to
+  // could still change the state of this output during the wait, to avoid that, we'd need to
   // keep the ControllerEmu::EmulatedController::GetStateLock() on, hanging the emulation.
-  std::this_thread::sleep_for(OUTPUT_TEST_TIME); //To do: Common::SleepCurrentThread(OUTPUT_TEST_TIME) with duration cast. We could actually not sleep at all now???
+  // The "perfect" way of doing this would be for outputs to have a state for the game
+  // and one for the UI (by thread), so they don't overwrite each other.
+  std::this_thread::sleep_for(OUTPUT_TEST_TIME);
   {
     const auto lock = ControllerEmu::EmulatedController::GetStateLock();
     reference->SetState(0.0);
