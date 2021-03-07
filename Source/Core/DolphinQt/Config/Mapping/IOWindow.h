@@ -101,7 +101,6 @@ private:
   };
 
   void UpdateExpression(std::string new_expression, UpdateMode mode = UpdateMode::Normal);
-  void SaveRange();
 
   ControlState GetNumericSettingValue() const;
 
@@ -142,8 +141,8 @@ private:
 
   ControlReference* m_reference;
   std::string m_original_expression;
+  ControlState m_original_range;
   ControllerEmu::EmulatedController* m_controller;
-  ControlState m_range;
 
   ciface::Core::DeviceQualifier m_devq;
   Type m_type;
