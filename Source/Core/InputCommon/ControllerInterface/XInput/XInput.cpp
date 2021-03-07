@@ -95,6 +95,8 @@ public:
   }
 
   std::string GetName() const override { return named_motors[m_index]; }
+
+private:
   void SetStateInternal(ControlState state) override
   {
     const auto old_value = m_motor;
@@ -105,7 +107,6 @@ public:
       m_parent->UpdateMotors();
   }
 
-private:
   WORD& m_motor;
   const WORD m_range;
   const u8 m_index;

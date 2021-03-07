@@ -90,9 +90,9 @@ public:
 
   std::string GetName() const override { return "Motor"; }
 
+private:
   void SetStateInternal(ControlState state) override { m_value = state; }
 
-private:
   ControlState& m_value;
 };
 
