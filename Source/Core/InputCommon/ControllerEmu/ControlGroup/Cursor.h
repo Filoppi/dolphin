@@ -30,7 +30,7 @@ public:
 
   Cursor(std::string name, std::string ui_name);
 
-  ReshapeData GetReshapableState(bool adjusted) final override;
+  ReshapeData GetReshapableState(bool adjusted) const final override;
   ControlState GetGateRadiusAtAngle(double ang) const override;
 
   StateData GetState(bool update = false, float absolute_time_elapsed = -1.f);
