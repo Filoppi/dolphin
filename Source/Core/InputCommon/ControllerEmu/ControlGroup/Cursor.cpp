@@ -14,6 +14,7 @@
 #include "Common/Common.h"
 #include "Common/MathUtil.h"
 
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
 #include "InputCommon/ControllerEmu/Control/Input.h"
@@ -25,10 +26,8 @@ namespace ControllerEmu
 using milli_with_remainder = std::chrono::duration<double, std::milli>;
 
 Cursor::Cursor(std::string name_, std::string ui_name_)
-
-    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor), m_last_update{
-                                                                                     Clock::now(),
-                                                                                     Clock::now()}
+    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor),
+      m_last_ui_update(Clock::now())
 {
   for (auto& named_direction : named_directions)
     AddInput(Translate, named_direction);
@@ -102,13 +101,21 @@ Cursor::StateData Cursor::GetState(bool is_ui, float absolute_time_elapsed)
 
   const auto input = GetReshapableState(true);
 
-  // Kill this after state is moved into wiimote rather than this class.
-  const auto now = Clock::now();
-
-  //To just use ControllerInterface::GetCurrentRealInputDeltaSeconds() if we can, and review the abs time setting...
-  const auto ms_since_update =
-      std::chrono::duration_cast<milli_with_remainder>(now - m_last_update[i]).count();
-  m_last_update[i] = now;
+  double ms_since_update;
+  // The UI updates at arbitrary refresh rates which aren't syncronized with devices updates
+  // so we need to calculate the time outselves. While if we are in game, we can just use the
+  // time of the controller interface channel, which is more reliable.
+  if (is_ui)
+  {
+    const auto now = Clock::now();
+    ms_since_update =
+        std::chrono::duration_cast<milli_with_remainder>(now - m_last_ui_update).count();
+    m_last_ui_update = now;
+  }
+  else
+  {
+    ms_since_update = g_controller_interface.GetCurrentRealInputDeltaSeconds() * 1000.0;
+  }
 
   // Relative input (the second check is for Hold):
   if (m_relative_setting.GetValue() ^ controls[6]->GetState<bool>())
@@ -187,7 +194,8 @@ void Cursor::ResetState(bool is_ui)
 
   m_auto_hide_timer[i] = AUTO_HIDE_MS;
 
-  m_last_update[i] = Clock::now();
+  if (is_ui)
+    m_last_ui_update = Clock::now();
 }
 
 ControlState Cursor::GetTotalYaw() const
