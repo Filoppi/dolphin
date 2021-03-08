@@ -59,7 +59,7 @@ public:
   bool IsInit() const { return m_is_init; }
 
   void UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
-                   double target_delta_seconds = 0.0);
+                   double target_delta_seconds = 0.0, u32 updates_per_target = 1);
   void SetChannelRunning(ciface::InputChannel input_channel, bool running);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
@@ -77,6 +77,7 @@ public:
   static ciface::InputChannel GetCurrentInputChannel();
   static double GetCurrentInputDeltaSeconds();
   static double GetTargetInputDeltaSeconds();
+  static s32 GetInputUpdatesPerTarget();
   static double GetCurrentRealInputDeltaSeconds();
 
 private:

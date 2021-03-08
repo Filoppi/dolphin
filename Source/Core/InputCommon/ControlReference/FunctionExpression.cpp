@@ -1283,17 +1283,16 @@ private:
 
   ControlState GetValue() const override
   {
-    //To review: values are NOT consistent (they swing a lot) (ControllerInterface::GetCurrentInputDeltaSeconds()?).
-    //Also simplify to 1 line. Values seem to be more consistent if the emu speed is 20% so maybe the code is correct. Though there are some spikes.
-    //Values don't seem to be 100% consistent between Wii and GC, they are slightly higher on GC?
-    ControlState base_value = GetArg(0).GetValue();
-    // This basically normalized the updates by:
+    const ControlState base_value = GetArg(0).GetValue();
+    // This normalizes the values by:
     // -the video refresh rate (50 or 60)
-    // -the emulation speed
+    // -the emulation target speed
+    // -the emulation achieved speed
     // -the real time oscillations between input polling
-    base_value *= ControllerInterface::GetTargetInputDeltaSeconds() /
-                  ControllerInterface::GetCurrentRealInputDeltaSeconds();
-    return base_value;
+    return base_value *
+           (ControllerInterface::GetTargetInputDeltaSeconds() /
+            ControllerInterface::GetCurrentRealInputDeltaSeconds()) /
+           double(ControllerInterface::GetInputUpdatesPerTarget());
   }
 };
 
