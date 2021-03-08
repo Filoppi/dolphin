@@ -48,6 +48,7 @@ using Clock = std::chrono::steady_clock;
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
 static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
+static s32 s_input_channels_updates_per_target[u8(ciface::InputChannel::Max)];
 static double s_input_channels_real_delta_seconds[u8(ciface::InputChannel::Max)];
 static Clock::time_point s_input_channels_last_update[u8(ciface::InputChannel::Max)];
 
@@ -372,7 +373,7 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
 
 // Update input for all devices if lock can be acquired without waiting.
 void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
-                                      double target_delta_seconds)
+                                      double target_delta_seconds, u32 updates_per_target)
 {
   ASSERT(m_is_init);  // Should never happen
   if (!m_is_init)
@@ -388,6 +389,7 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
   // Delta seconds can be bigger or smaller than the target one, but they should average out
   s_input_channels_target_delta_seconds[u8(tls_input_channel)] =
       target_delta_seconds > 0.f ? target_delta_seconds : delta_seconds;
+  s_input_channels_updates_per_target[u8(tls_input_channel)] = updates_per_target;
 
   // Calculate the real/world elapsed time.
   // Useful to turn relative axes into "rate of change"/speed values usable by games
@@ -503,6 +505,11 @@ double ControllerInterface::GetCurrentInputDeltaSeconds()
 double ControllerInterface::GetTargetInputDeltaSeconds()
 {
   return s_input_channels_target_delta_seconds[u8(tls_input_channel)];
+}
+
+s32 ControllerInterface::GetInputUpdatesPerTarget()
+{
+  return s_input_channels_updates_per_target[u8(tls_input_channel)];
 }
 
 double ControllerInterface::GetCurrentRealInputDeltaSeconds()

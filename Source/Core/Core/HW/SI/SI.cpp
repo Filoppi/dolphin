@@ -659,7 +659,7 @@ void UpdateDevices(double delta_seconds, double average_delta_seconds)
                                SConfig::GetInstance().bLockCursor, true,
                                ciface::InputChannel::SerialInterface);
   g_controller_interface.UpdateInput(ciface::InputChannel::SerialInterface, delta_seconds,
-                                     average_delta_seconds);
+                                     average_delta_seconds, 2);
 
   // Update channels and set the status bit if there's new data
   s_status_reg.RDST0 =
