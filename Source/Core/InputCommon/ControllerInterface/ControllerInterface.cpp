@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 
+#include "Common/Assert.h"
 #include "Common/Logging/Log.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
 
@@ -371,6 +372,10 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
 void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double delta_seconds,
                                       double target_delta_seconds)
 {
+  ASSERT(m_is_init);  // Should never happen
+  if (!m_is_init)
+    return;
+
   // We set the read/write input channel here, see Device::RelativeInput for more info.
   // The other information is used by FunctionExpression(s) to determine their timings.
   // Inputs for this channel will be read immediately after this call.
@@ -412,21 +417,20 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
   if (!m_is_init)
     return;
 
-  ciface::InputChannel prev_input_channel = tls_input_channel;
-  tls_input_channel = input_channel;
-
   std::lock_guard lk(m_devices_mutex);
+
+  const ciface::InputChannel prev_input_channel = tls_input_channel;
+  tls_input_channel = input_channel;
 
   if (running)
   {
     // No need to clean s_input_channels_delta_seconds and the others
-    s_input_channels_last_update[u8(input_channel)] = Clock::now();
+    s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
+
+    const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
 
     for (auto& d : m_devices)
-    {
-      const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
       d->ResetInput();
-    }
   }
   else
   {
@@ -437,7 +441,7 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
       d->ResetOutput();
     }
     // TODO: after calling SetChannelRunning() we should force re-apply all the current
-    // OutputReference(s)
+    // OutputReference(s). Or outputs should also have a state per input channel.
   }
 
   tls_input_channel = prev_input_channel;
