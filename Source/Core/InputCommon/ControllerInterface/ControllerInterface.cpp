@@ -132,11 +132,13 @@ void ControllerInterface::RefreshDevices(bool because_of_window_change)
   {
     m_is_populating_devices.fetch_add(1);
 
-    std::lock_guard lk(m_devices_mutex);
+    m_devices_mutex.lock();
 
     // No need to do anything else in this case.
     // Only (Win32) DInput needs the window handle to be updated.
     ciface::Win32::ChangeWindow(m_wsi.render_window);
+
+    m_devices_mutex.unlock();
 
     if (m_is_populating_devices.fetch_sub(1) == 1)
       InvokeDevicesChangedCallbacks();
