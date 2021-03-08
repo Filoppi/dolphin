@@ -152,9 +152,6 @@ private:
 
     bool IsDetectable() const override { return false; }
 
-    // We don't need focus to pass the battery level
-    FocusFlags GetFocusFlags() const override { return FocusFlags::IgnoreFocus; }
-
   private:
     const BatteryState& m_battery;
   };

@@ -41,7 +41,7 @@ private:
 };
 
 // GetState returns value divided by supplied "extent".
-template <typename T, bool Detectable, Device::FocusFlags FocusFlags = Device::FocusFlags::Default>
+template <typename T, bool Detectable>
 class GenericInput : public Core::Device::Input
 {
 public:
@@ -51,8 +51,6 @@ public:
   }
 
   bool IsDetectable() const override { return Detectable; }
-
-  Core::Device::FocusFlags GetFocusFlags() const override { return FocusFlags; }
 
   std::string GetName() const override { return m_name; }
 
@@ -67,8 +65,8 @@ protected:
 template <typename T>
 using AnalogInput = GenericInput<T, true>;
 
-template <typename T, Core::Device::FocusFlags FocusFlags = Core::Device::FocusFlags::Default>
-using UndetectableAnalogInput = GenericInput<T, false, FocusFlags>;
+template <typename T>
+using UndetectableAnalogInput = GenericInput<T, false>;
 
 // GetName() is appended with '-' or '+' based on sign of "extent" value.
 template <bool Detectable>
@@ -292,12 +290,10 @@ Device::Device(std::unique_ptr<WiimoteReal::Wiimote> wiimote) : m_wiimote(std::m
   AddInput(new AnalogInput<float>(&m_classic_state.triggers[1], classic_prefix + "R-Analog", 1.f));
 
   // Specialty inputs:
-  AddInput(new UndetectableAnalogInput<float, Core::Device::FocusFlags::IgnoreFocus>(
-      &m_battery, "Battery", 1.f));
-  AddInput(new UndetectableAnalogInput<WiimoteEmu::ExtensionNumber,
-                                       Core::Device::FocusFlags::IgnoreFocus>(
+  AddInput(new UndetectableAnalogInput<float>(&m_battery, "Battery", 1.f));
+  AddInput(new UndetectableAnalogInput<WiimoteEmu::ExtensionNumber>(
       &m_extension_number_input, "Attached Extension", WiimoteEmu::ExtensionNumber(1)));
-  AddInput(new UndetectableAnalogInput<bool, Core::Device::FocusFlags::IgnoreFocus>(
+  AddInput(new UndetectableAnalogInput<bool>(
       &m_mplus_attached_input, "Attached MotionPlus", 1));
 
   AddOutput(new Motor(&m_rumble_level));
