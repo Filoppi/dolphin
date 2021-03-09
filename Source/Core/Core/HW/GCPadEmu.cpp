@@ -133,7 +133,7 @@ ControllerEmu::ControlGroup* GCPad::GetGroup(PadGroup group)
 
 GCPadStatus GCPad::GetInput()
 {
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   GCPadStatus pad = {};
 

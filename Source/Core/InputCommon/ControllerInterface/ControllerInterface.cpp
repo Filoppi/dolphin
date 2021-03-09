@@ -46,6 +46,7 @@ using Clock = std::chrono::steady_clock;
 // threads as hotkeys are updated from a worker thread, but UI can read from the main thread. This
 // will never interfere with game threads.
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
+static s32 s_input_channels_just_started[u8(ciface::InputChannel::Max)];
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
 static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
 static s32 s_input_channels_updates_per_target[u8(ciface::InputChannel::Max)];
@@ -390,6 +391,10 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
   s_input_channels_target_delta_seconds[u8(tls_input_channel)] =
       target_delta_seconds > 0.f ? target_delta_seconds : delta_seconds;
   s_input_channels_updates_per_target[u8(tls_input_channel)] = updates_per_target;
+  // After starting or resuming an input channel, this method will be called again before
+  // we get the change to restore outputs, so we need it to have a value of 2.
+  if (s_input_channels_just_started[u8(tls_input_channel)] > 0)
+    s_input_channels_just_started[u8(tls_input_channel)]--;
 
   // Calculate the real/world elapsed time.
   // Useful to turn relative axes into "rate of change"/speed values usable by games
@@ -430,6 +435,7 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
   {
     // No need to clean s_input_channels_delta_seconds and the others
     s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
+    s_input_channels_just_started[u8(tls_input_channel)] = 2;
 
     const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
 
@@ -438,14 +444,14 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
   }
   else
   {
+    s_input_channels_just_started[u8(tls_input_channel)] = 0;
+
     for (auto& d : m_devices)
     {
       // This isn't 100% right as other input channels could still be changing the outputs but
       // as of now that could never happen and even so, it's still better than stuck output values
       d->ResetOutput();
     }
-    // TODO: after calling SetChannelRunning() we should force re-apply all the current
-    // OutputReference(s). Or outputs should also have a state per input channel.
   }
 
   tls_input_channel = prev_input_channel;
@@ -495,6 +501,11 @@ void ControllerInterface::InvokeDevicesChangedCallbacks() const
 ciface::InputChannel ControllerInterface::GetCurrentInputChannel()
 {
   return tls_input_channel;
+}
+
+bool ControllerInterface::HasInputChannelJustStarted()
+{
+  return s_input_channels_just_started[u8(tls_input_channel)] > 0;
 }
 
 double ControllerInterface::GetCurrentInputDeltaSeconds()

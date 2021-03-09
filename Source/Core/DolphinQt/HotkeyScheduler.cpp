@@ -179,14 +179,14 @@ void HotkeyScheduler::Run()
         for (int i = 0; i < config->GetControllersNum(); ++i)
         {
           if (WiimoteCommon::GetSource((unsigned int)(i)) == WiimoteSource::Emulated)
-            config->GetController(i)->CacheInput();
+            config->GetController(i)->CacheInputAndRefreshOutput();
         }
       }
       config = Pad::GetConfig();
       for (int i = 0; i < config->GetControllersNum(); ++i)
       {
         if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[i]))
-          config->GetController(i)->CacheInput();
+          config->GetController(i)->CacheInputAndRefreshOutput();
       }
       config = Keyboard::GetConfig();
       for (int i = 0; i < config->GetControllersNum(); ++i)
@@ -194,7 +194,7 @@ void HotkeyScheduler::Run()
         if (SConfig::GetInstance().m_SIDevice[i] ==
             SerialInterface::SIDevices::SIDEVICE_GC_KEYBOARD)
         {
-          config->GetController(i)->CacheInput();
+          config->GetController(i)->CacheInputAndRefreshOutput();
         }
       }
     }

@@ -92,19 +92,23 @@ void EmulatedController::UpdateSingleControlReference(const ControllerInterface&
   ref->UpdateReference(env);
 }
 
-void EmulatedController::CacheInput()
+void EmulatedController::CacheInputAndRefreshOutput()
 {
   const auto state_lock = GetStateLock();
   const auto devices_input_lock = GetDevicesInputLock();
+  const bool restore_outputs = g_controller_interface.HasInputChannelJustStarted();
 
   for (auto& ctrlGroup : groups)
   {
     for (auto& control : ctrlGroup->controls)
     {
-      // We could easily also cache outputs here, but we don't really want because it's
-      // mostly useless and they'd be one "frame" late (also we'd need to remove the call to
+      // We could easily also always cache/refresh outputs here, but we don't really want because
+      // it's mostly useless and they'd be one "frame" late (also we'd need to remove the call to
       // UpdateState() within SetState()).
       if (control->control_ref->IsInput())
+        control->control_ref->UpdateState();
+      // If we have unpaused, restore outputs in the first frame, as they had been reset
+      else if (restore_outputs)
         control->control_ref->UpdateState();
     }
 
@@ -120,7 +124,7 @@ void EmulatedController::CacheInput()
       attachments->GetSelectionSetting().Update();
 
       // Only cache the currently selected attachment
-      attachments->GetAttachmentList()[attachments->GetSelectedAttachment()]->CacheInput();
+      attachments->GetAttachmentList()[attachments->GetSelectedAttachment()]->CacheInputAndRefreshOutput();
     }
   }
 }

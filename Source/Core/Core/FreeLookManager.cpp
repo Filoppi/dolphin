@@ -199,7 +199,7 @@ void FreeLookController::Update()
   if (!g_freelook_camera.IsActive())
     return;
 
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   float dt = 1.0;
   if (m_last_free_look_rotate_time)

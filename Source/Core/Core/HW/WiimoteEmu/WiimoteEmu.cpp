@@ -426,7 +426,7 @@ void Wiimote::UpdateButtonsStatus()
 // This is called every ::Wiimote::UPDATE_FREQ (200hz)
 void Wiimote::Update()
 {
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   // Hotkey / settings modifier
   // Data is later accessed in IsSideways and IsUpright
