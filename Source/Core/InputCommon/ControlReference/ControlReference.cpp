@@ -131,6 +131,10 @@ const std::string& ControlReference::GetExpression() const
 std::optional<std::string> ControlReference::SetExpression(std::string expr)
 {
   ControllerEmu::EmulatedController::EnsureStateLock();
+  // Don't do anything if it hasn't changed. This happens often as we reload configs every time we
+  // open input panels. We parse it again because we need to return the results, which we don't have
+  if (m_expression == expr)
+    return ParseExpression(m_expression).description;
   // If there are any spaces or line breaks, we keep them as they can be used for clarity
   m_expression = std::move(expr);
   auto parse_result = ParseExpression(m_expression);
