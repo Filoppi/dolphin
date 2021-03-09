@@ -111,7 +111,7 @@ ControllerEmu::ControlGroup* GCKeyboard::GetGroup(KeyboardGroup group)
 
 KeyboardStatus GCKeyboard::GetInput()
 {
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   KeyboardStatus kb = {};
 

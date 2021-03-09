@@ -227,7 +227,7 @@ public:
   void UpdateSingleControlReference(const ControllerInterface& devi, ControlReference* ref);
 
   // Caches all the input once for later retrieval.
-  void CacheInput();
+  void CacheInputAndRefreshOutput();
 
   // This should be called before calling most methods of a ControlReference (thus also
   // NumericSetting<T> and SettingValue<T>), except GetState()/GetValue(), to prevent cuncurrent

@@ -75,6 +75,7 @@ public:
   void InvokeDevicesChangedCallbacks() const;
 
   static ciface::InputChannel GetCurrentInputChannel();
+  static bool HasInputChannelJustStarted();
   static double GetCurrentInputDeltaSeconds();
   static double GetTargetInputDeltaSeconds();
   static s32 GetInputUpdatesPerTarget();

@@ -363,7 +363,7 @@ std::string HotkeyManager::GetName() const
 
 void HotkeyManager::GetInput(HotkeyStatus* const kb)
 {
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   for (std::size_t group = 0; group < s_groups_info.size(); group++)
   {

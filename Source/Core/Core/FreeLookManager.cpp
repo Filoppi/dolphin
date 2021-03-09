@@ -151,7 +151,7 @@ void FreeLookController::Update()
   if (!g_freelook_camera.IsActive())
     return;
 
-  CacheInput();
+  CacheInputAndRefreshOutput();
 
   if (m_move_buttons->controls[MoveButtons::Up]->GetState<bool>())
     g_freelook_camera.MoveVertical(-g_freelook_camera.GetSpeed());
