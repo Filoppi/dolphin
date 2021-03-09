@@ -295,12 +295,6 @@ private:
   }
 };
 
-//To test cache(`Cursor Y+`, hasFocus())
-//Test input focus code with pause on unfocus.
-//test single output, wiimote battery focus
-//Add missing _trans("")
-//prefilled array (???)
-
 // usage: interval(delay_frames, duration_frames)
 class IntervalExpression : public FunctionExpression
 {
@@ -1466,8 +1460,6 @@ private:
   }
 };
 
-// TODO: getAspectRation() function
-
 // usage: timeToInputFrames(seconds)
 class TimeToInputFramesExpression : public FunctionExpression
 {
@@ -1546,14 +1538,21 @@ private:
   {
     return _trans("Can be used to cache inputs values on focus loss, or to trigger inputs the "
                   "window loses focus, like pausing the game pause or changing the emulation speed."
-                  " Only works on the emulation window.");
+                  " Only applies to the emulation window");
   }
 
   Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
 
-  // There is no need to cache this, nor to return the control gate cached version of focus,
-  // we want this to be as up to date as possible
-  ControlState GetValue() const override { return Host_RendererHasFocus(); }
+  ControlState GetValue() const override
+  {
+    // Ignore this for non game channels, it's not necessary (also couldn't be tested in the UI)
+    if (ControllerInterface::GetCurrentInputChannel() != InputChannel::SerialInterface &&
+        ControllerInterface::GetCurrentInputChannel() != InputChannel::Bluetooth)
+      return true;
+    // There is no need to cache this, nor to return the control gate cached version of focus,
+    // we want this to be as up to date as possible
+    return Host_RendererHasFocus();
+  }
 };
 
 // usage: scaleSet(output, scale)
