@@ -226,6 +226,12 @@ public:
   void UpdateReferences(const ControllerInterface& devi);
   void UpdateSingleControlReference(const ControllerInterface& devi, ControlReference* ref);
 
+  const ciface::ExpressionParser::ControlEnvironment::VariableContainer&
+  GetExpressionVariables() const;
+
+  // Resets the values while keeping the list
+  void ResetExpressionVariables();
+
   // Caches all the input once for later retrieval.
   void CacheInputAndRefreshOutput();
 
@@ -273,10 +279,6 @@ public:
 protected:
   // TODO: Wiimote attachments actually end up using their parent controller value for this,
   // so theirs won't be used (and thus shouldn't even exist).
-  // Note that these are never cleaned, even after they aren't referenced anymore.
-  // TODO: we could mark all of them as unreferenced before calling UpdateReferences(),
-  // then actually check which ones are still used and remove the others.
-  // We could also use a way of resetting their value directly.
   ciface::ExpressionParser::ControlEnvironment::VariableContainer m_expression_vars;
 
   void UpdateReferences(ciface::ExpressionParser::ControlEnvironment& env);

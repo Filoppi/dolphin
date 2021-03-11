@@ -57,6 +57,8 @@ void EmulatedController::UpdateReferences(const ControllerInterface& devi)
   ciface::ExpressionParser::ControlEnvironment env(devi, GetDefaultDevice(), m_expression_vars);
 
   UpdateReferences(env);
+
+  env.CleanUnusedVariables();
 }
 
 void EmulatedController::UpdateReferences(ciface::ExpressionParser::ControlEnvironment& env)
@@ -88,8 +90,25 @@ void EmulatedController::UpdateSingleControlReference(const ControllerInterface&
                                                       ControlReference* ref)
 {
   ciface::ExpressionParser::ControlEnvironment env(devi, GetDefaultDevice(), m_expression_vars);
+
   const auto lock = GetStateLock();
   ref->UpdateReference(env);
+
+  env.CleanUnusedVariables();
+}
+
+const ciface::ExpressionParser::ControlEnvironment::VariableContainer&
+EmulatedController::GetExpressionVariables() const
+{
+  return m_expression_vars;
+}
+
+void EmulatedController::ResetExpressionVariables()
+{
+  for (auto& var : m_expression_vars)
+  {
+    var.second.state = 0;
+  }
 }
 
 void EmulatedController::CacheInputAndRefreshOutput()

@@ -510,12 +510,18 @@ class VariableExpression : public Expression
 public:
   VariableExpression(std::string name) : m_name(name) {}
 
-  ControlState GetValue() const override { return m_value_ptr ? *m_value_ptr : 0; }
+  ~VariableExpression() override
+  {
+    if (m_variable_ptr)
+      m_variable_ptr->reference_counter--;
+  }
+
+  ControlState GetValue() const override { return m_variable_ptr ? m_variable_ptr->state : 0; }
 
   void SetValue(ControlState value) override
   {
-    if (m_value_ptr)
-      *m_value_ptr = value;
+    if (m_variable_ptr)
+      m_variable_ptr->state = value;
   }
 
   // This can point to anything but it should probably ignore focus by default
@@ -526,12 +532,19 @@ public:
   void UpdateReferences(ControlEnvironment& env, bool is_input) override
   {
     // There is no need to use "is_input" unless we wanted to separate them between input and output
-    m_value_ptr = env.GetVariablePtr(m_name);
+
+    if (m_variable_ptr)
+      m_variable_ptr->reference_counter--;
+
+    m_variable_ptr = env.GetVariablePtr(m_name);
+
+    if (m_variable_ptr)
+      m_variable_ptr->reference_counter++;
   }
 
 protected:
   const std::string m_name;
-  ControlState* m_value_ptr{};
+  ControlEnvironment::VariableState* m_variable_ptr{};
 };
 
 class HotkeyExpression : public Expression
@@ -660,9 +673,22 @@ std::shared_ptr<Device> ControlEnvironment::FindDevice(ControlQualifier qualifie
     return container.FindDevice(default_device);
 }
 
-ControlState* ControlEnvironment::GetVariablePtr(const std::string& name)
+ControlEnvironment::VariableState* ControlEnvironment::GetVariablePtr(const std::string& name)
 {
+  if (name.empty())
+    return nullptr;
   return &m_variables[name];
+}
+
+void ControlEnvironment::CleanUnusedVariables()
+{
+  for (auto it = m_variables.begin(); it != m_variables.end();)
+  {
+    if (it->second.reference_counter == 0)
+      m_variables.erase(it++);
+    else
+      ++it;
+  }
 }
 
 ParseResult ParseResult::MakeEmptyResult()
@@ -824,7 +850,10 @@ private:
     }
     case TOK_VARIABLE:
     {
-      return ParseResult::MakeSuccessfulResult(std::make_unique<VariableExpression>(tok.data));
+      if (tok.data.empty())
+        return ParseResult::MakeErrorResult(tok, _trans("Expected variable name."));
+      else
+        return ParseResult::MakeSuccessfulResult(std::make_unique<VariableExpression>(tok.data));
     }
     case TOK_LPAREN:
     {

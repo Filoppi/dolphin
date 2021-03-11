@@ -144,7 +144,13 @@ public:
 class ControlEnvironment
 {
 public:
-  using VariableContainer = std::map<std::string, ControlState>;
+  struct VariableState
+  {
+    VariableState() : state(0), reference_counter(0) { }
+    ControlState state;
+    s32 reference_counter;
+  };
+  using VariableContainer = std::map<std::string, VariableState>;
 
   ControlEnvironment(const Core::DeviceContainer& container_, const Core::DeviceQualifier& default_,
                      VariableContainer& vars)
@@ -153,7 +159,9 @@ public:
   }
 
   std::shared_ptr<Core::Device> FindDevice(ControlQualifier qualifier) const;
-  ControlState* GetVariablePtr(const std::string& name);
+  VariableState* GetVariablePtr(const std::string& name);
+
+  void CleanUnusedVariables();
 
 private:
   VariableContainer& m_variables;
