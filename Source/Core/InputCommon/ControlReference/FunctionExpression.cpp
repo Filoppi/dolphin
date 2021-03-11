@@ -1305,8 +1305,8 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans(
-        "Keeps the value true for \"seconds\" (increasingly) every time you press the input");
+    return _trans("Keeps the value true for \"seconds\" (increasingly) every time the input starts "
+                  "being true");
   }
 
   ControlState GetValue() const override
@@ -1454,9 +1454,11 @@ private:
 
   ControlState GetValue() const override
   {
-    // This will return 1 when the emulation is not running, wether in the UI or not
-    return 1.0;
-    //To implement: return Core::GetActualEmulationSpeed() when PR 9417 is merged (and make it atomic).
+    if ((ControllerInterface::GetCurrentInputChannel() != InputChannel::SerialInterface &&
+         ControllerInterface::GetCurrentInputChannel() != InputChannel::Bluetooth) ||
+        ::Core::GetState() == ::Core::State::Uninitialized)
+      return 1;
+    return ::Core::GetActualEmulationSpeed();
   }
 };
 
@@ -1581,6 +1583,7 @@ private:
   ControlState GetValue() const override { return GetArg(0).GetValue() * GetArg(1).GetValue(); }
 };
 
+// Where there are two names it's to maintain compatibility with previous names
 std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name)
 {
   // Logic/Math:
