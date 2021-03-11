@@ -19,6 +19,7 @@
 #include "Common/MathUtil.h"
 #include "Common/Matrix.h"
 #include "Common/Random.h"
+#include "Common/ScopeGuard.h"
 #include "Common/StringUtil.h"
 #include "Common/Thread.h"
 #include "Core/CoreTiming.h"
@@ -304,114 +305,111 @@ static bool IsSameController(const Proto::MessageType::PortInfo& a,
          std::tie(b.pad_id, b.pad_state, b.model, b.connection_type, b.pad_mac_address);
 }
 
-static sf::Socket::Status ReceiveWithTimeout(sf::UdpSocket& socket, void* data, std::size_t size,
-                                             std::size_t& received, sf::IpAddress& remoteAddress,
-                                             unsigned short& remotePort, sf::Time timeout)
-{
-  sf::SocketSelector selector;
-  selector.add(socket);
-  if (selector.wait(timeout))
-    return socket.receive(data, size, received, remoteAddress, remotePort);
-  else
-    return sf::Socket::NotReady;
-}
-
-struct AutoThreadLogging
-{
-  AutoThreadLogging()
-  {
-    INFO_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient hotplug thread started");
-  }
-  ~AutoThreadLogging()
-  {
-    INFO_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient hotplug thread stopped");
-  }
-};
-
 static void HotplugThreadFunc()
 {
   Common::SetCurrentThreadName("DualShockUDPClient Hotplug Thread");
-  AutoThreadLogging auto_logging;
+  INFO_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient hotplug thread started");
+  Common::ScopeGuard thread_stop_guard{
+      [] { INFO_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient hotplug thread stopped"); }};
+
+  std::vector<bool> timed_out_servers(s_servers.size(), false);
 
   while (s_hotplug_thread_running.IsSet())
   {
     using namespace std::chrono;
     using namespace std::chrono_literals;
-
-    auto now = SteadyClock::now();
-    s_next_listports_time = now + SERVER_LISTPORTS_INTERVAL;
-
-    // Request info on the four controller ports
-    for (auto& server : s_servers)
+    
+    const auto now = SteadyClock::now();
+    if (now >= s_next_listports_time)
     {
-      Proto::Message<Proto::MessageType::ListPorts> msg(s_client_uid);
-      auto& list_ports = msg.m_message;
-      // We ask for x possible devices. We will receive a message for every connected device.
-      list_ports.pad_request_count = SERVER_ASKED_PADS;
-      list_ports.pad_ids = {0, 1, 2, 3};
-      msg.Finish();
-      if (server.m_socket.send(&list_ports, sizeof list_ports, server.m_address, server.m_port) !=
-          sf::Socket::Status::Done)
+      s_next_listports_time = now + SERVER_LISTPORTS_INTERVAL;
+
+      for (size_t i = 0; i < s_servers.size(); ++i)
       {
-        ERROR_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient HotplugThreadFunc send failed");
+        auto& server = s_servers[i];
+        Proto::Message<Proto::MessageType::ListPorts> msg(s_client_uid);
+        auto& list_ports = msg.m_message;
+        // We ask for x possible devices. We will receive a message for every connected device.
+        list_ports.pad_request_count = SERVER_ASKED_PADS;
+        list_ports.pad_ids = {0, 1, 2, 3};
+        msg.Finish();
+        if (server.m_socket.send(&list_ports, sizeof list_ports, server.m_address, server.m_port) !=
+            sf::Socket::Status::Done)
+        {
+          ERROR_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient HotplugThreadFunc send failed");
+        }
+        timed_out_servers[i] = true;
       }
     }
 
-    // Equally spread the timeout between the number of servers to avoid waits being too long
-    // and hanging the main thread on closure.
-    // We use the "now" from above to avoid breaking while stepping through the code.
-    // Note that this thread won't be running if we have no servers.
-    const auto timeout = (s_next_listports_time - now) / s_servers.size();
+    sf::SocketSelector selector;
+    for (auto& server : s_servers)
+    {
+      selector.add(server.m_socket);
+    }
+
+    auto timeout = duration_cast<milliseconds>(s_next_listports_time - SteadyClock::now());
 
     // Receive controller port info within a time from our request.
     // Run this even if we sent no new requests, to disconnect devices,
     // sleep (wait) the thread and catch old responses.
-    for (auto& server : s_servers)
+    do
     {
-      //To review: increase time of the first one and fix comments
-      // ReceiveWithTimeout treats a timeout of zero as infinite timeout, which we don't want.
-      // Also define a max wait time for every server, again, to avoid long waits.
-      const auto adujusted_timout_ms =
-          std::clamp(duration_cast<milliseconds>(timeout),
-                     std::chrono::milliseconds(SERVER_ASKED_PADS), THREAD_MAX_WAIT_INTERVAL);
-      auto current_timeout_ms = adujusted_timout_ms / SERVER_ASKED_PADS;
-      Proto::Message<Proto::MessageType::FromServer> msg;
-      std::size_t received_bytes;
-      sf::IpAddress sender;
-      u16 port;
-      bool timed_out = true;
-      u32 received_messages = 0;
-      while (ReceiveWithTimeout(server.m_socket, &msg, sizeof(msg), received_bytes, sender, port,
-                                sf::milliseconds(current_timeout_ms.count())) ==
-             sf::Socket::Status::Done)
+      // Selector's wait treats a timeout of zero as infinite timeout, which we don't want,
+      // but we also don't want risk waiting for the whole SERVER_LISTPORTS_INTERVAL and hang
+      // the thead trying to close this one in case we received no answers.
+      const auto current_timeout = std::max(std::min(timeout, THREAD_MAX_WAIT_INTERVAL), 1ms);
+      timeout -= current_timeout;
+      // This will return at the first answer
+      if (selector.wait(sf::milliseconds(current_timeout.count())))
       {
-        if (auto port_info = msg.CheckAndCastTo<Proto::MessageType::PortInfo>())
+        // Now check all the servers because we don't know which one(s) sent a reply
+        for (size_t i = 0; i < s_servers.size(); ++i)
         {
-          ++received_messages;
-          server.m_disconnect_time = SteadyClock::now() + SERVER_UNRESPONSIVE_INTERVAL;
-          timed_out = false;  // We have receive at least one valid update, that's enough
-          if (received_messages >= SERVER_ASKED_PADS)
+          auto& server = s_servers[i];
+          if (!selector.isReady(server.m_socket))
           {
-            current_timeout_ms = 1ms;  // Don't wait longer than necessary for extra messages
+            continue;
           }
 
-          const bool port_changed =
-              !IsSameController(*port_info, server.m_port_info[port_info->pad_id]);
-          if (port_changed)
+          Proto::Message<Proto::MessageType::FromServer> msg;
+          std::size_t received_bytes;
+          sf::IpAddress sender;
+          u16 port;
+          if (server.m_socket.receive(&msg, sizeof(msg), received_bytes, sender, port) !=
+              sf::Socket::Status::Done)
           {
-            server.m_port_info[port_info->pad_id] = *port_info;
-            // Just remove and re-add all the devices for simplicity
-            g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
+            continue;
+          }
+
+          if (auto port_info = msg.CheckAndCastTo<Proto::MessageType::PortInfo>())
+          {
+            server.m_disconnect_time = SteadyClock::now() + SERVER_UNRESPONSIVE_INTERVAL;
+            // We have receive at least one valid update, that's enough. This is needed to avoid
+            // false positive when checking for disconnection in case our thread waited too long
+            timed_out_servers[i] = false;
+
+            const bool port_changed =
+                !IsSameController(*port_info, server.m_port_info[port_info->pad_id]);
+            if (port_changed)
+            {
+              server.m_port_info[port_info->pad_id] = *port_info;
+              // Just remove and re-add all the devices for simplicity
+              g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
+            }
           }
         }
-
-        if (!s_hotplug_thread_running.IsSet())  // Avoid hanging the thread for too long
-          return;
       }
+      if (!s_hotplug_thread_running.IsSet())  // Avoid hanging the thread for too long
+        return;
+    } while (timeout > 0ms);
 
-      // If we have failed to receive any information from the server (or even send it),
-      // disconnect all devices from it (after enough time has elapsed, to avoid false positives).
-      if (timed_out && SteadyClock::now() >= server.m_disconnect_time)
+    // If we have failed to receive any information from the server (or even send it),
+    // disconnect all devices from it (after enough time has elapsed, to avoid false positives).
+    for (size_t i = 0; i < s_servers.size(); ++i)
+    {
+      auto& server = s_servers[i];
+      if (timed_out_servers[i] && SteadyClock::now() >= server.m_disconnect_time)
       {
         bool any_connected = false;
         for (size_t port_index = 0; port_index < server.m_port_info.size(); port_index++)
@@ -425,23 +423,6 @@ static void HotplugThreadFunc()
         if (any_connected)
           g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
       }
-    }
-
-    // If we received all the responses in a shorter time, sleep thread for the remaining time.
-    // This is mainly to not hang the main thread too long when trying to close this one.
-    now = SteadyClock::now();
-    const bool time_elapsed = now >= s_next_listports_time;
-    if (!time_elapsed)
-    {
-      auto sleep_ms = duration_cast<milliseconds>(s_next_listports_time - now);
-      do
-      {
-        if (!s_hotplug_thread_running.IsSet())
-          return;
-        auto current_sleep_ms = std::min(sleep_ms, THREAD_MAX_WAIT_INTERVAL);
-        sleep_ms -= current_sleep_ms;
-        Common::SleepCurrentThread(current_sleep_ms.count());
-      } while (sleep_ms.count() > 0);
     }
   }
 }
@@ -475,7 +456,7 @@ static void StopHotplugThread()
   }
 }
 
-static void Restart()
+static void Restart()  // Also just start
 {
   INFO_LOG_FMT(CONTROLLERINTERFACE, "DualShockUDPClient Restart");
 
