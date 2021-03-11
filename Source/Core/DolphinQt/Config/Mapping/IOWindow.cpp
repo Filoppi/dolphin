@@ -257,6 +257,7 @@ IOWindow::IOWindow(MappingWidget* parent, ControllerEmu::EmulatedController* con
   CreateMainLayout();
 
   connect(parent, &MappingWidget::Update, this, &IOWindow::Update);
+  connect(parent->GetParent(), &MappingWindow::ConfigChanged, this, &IOWindow::ConfigChanged);
 
   QString title =
       m_type == IOWindow::Type::Output ?
@@ -334,7 +335,7 @@ void IOWindow::CreateMainLayout()
   m_expression_text->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
   new ControlExpressionSyntaxHighlighter(m_expression_text->document());
 
-  m_operators_combo = new QComboBoxWithMouseWheelDisabled();
+  m_operators_combo = new QComboBoxWithMouseWheelDisabled(this);
   m_operators_combo->addItem(tr("Operators"));
   m_operators_combo->insertSeparator(1);
   // These operators won't be needed with Outputs
@@ -733,7 +734,7 @@ void IOWindow::ConnectWidgets()
   });
 
   connect(m_functions_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
-    if (0 == index || 1 == index)
+    if (0 == index)
       return;
 
     m_expression_text->insertPlainText(m_functions_combo->currentText() + QStringLiteral("(") +
