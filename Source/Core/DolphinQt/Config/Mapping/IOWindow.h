@@ -122,6 +122,7 @@ private:
   QPushButton* m_select_button;
   QComboBox* m_operators_combo;
   QComboBox* m_functions_combo;
+  QComboBox* m_variables_combo;
 
   // Input actions
   QPushButton* m_detect_button;

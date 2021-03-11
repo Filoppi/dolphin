@@ -446,6 +446,16 @@ void IOWindow::CreateMainLayout()
     AddFunction("cache");
   }
 
+  m_variables_combo = new QComboBoxWithMouseWheelDisabled(this);
+  m_variables_combo->addItem(tr("User Variables"));
+  m_variables_combo->setToolTip(
+      tr("User defined variables usable in the control expression.\nYou can use them to save or "
+         "retrive values,\nor even to share states between inputs and outputs.\nThey can only be "
+         "shared between mappings\nof the same parent controller"));
+  m_variables_combo->insertSeparator(m_variables_combo->count());
+  m_variables_combo->addItem(tr("Reset Values"));  // Add this even if we have no values
+  m_variables_combo->insertSeparator(m_variables_combo->count());
+
   // Devices
   m_main_layout->addWidget(m_devices_combo);
 
@@ -516,6 +526,8 @@ void IOWindow::CreateMainLayout()
     button_vbox->addWidget(m_test_selected_button);
     button_vbox->addWidget(m_test_results_button);
   }
+
+  button_vbox->addWidget(m_variables_combo);
 
   button_vbox->addWidget(m_operators_combo);
 
@@ -693,6 +705,23 @@ void IOWindow::ConnectWidgets()
 
   connect(m_expression_text, &QPlainTextEdit::textChanged,
           [this] { UpdateExpression(m_expression_text->toPlainText().toStdString()); });
+
+  connect(m_variables_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
+    if (0 == index)
+      return;
+
+    if (index == 2)  // Reset button. 1 and 3 are separators.
+    {
+      const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+      m_controller->ResetExpressionVariables();
+    }
+    else
+    {
+      m_expression_text->insertPlainText(QStringLiteral("$") + m_variables_combo->currentText());
+    }
+
+    m_variables_combo->setCurrentIndex(0);
+  });
 
   connect(m_operators_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
     if (0 == index)
@@ -927,6 +956,16 @@ void IOWindow::UpdateExpression(std::string new_expression, UpdateMode mode)
   }
   const auto status = m_reference->GetParseStatus();
   m_controller->UpdateSingleControlReference(g_controller_interface, m_reference);
+  
+  // This is the only place where we need to update the shown user variables:
+  while (m_variables_combo->count() > 4)  // Keep the previous items
+  {
+    m_variables_combo->removeItem(m_variables_combo->count() - 1);
+  }
+  for (const auto& expression : m_controller->GetExpressionVariables())
+  {
+    m_variables_combo->addItem(QString::fromStdString(expression.first));
+  }
 
   QString state_appended_string;
   if (error)
