@@ -524,9 +524,6 @@ public:
       m_variable_ptr->state = value;
   }
 
-  // This can point to anything but it should probably ignore focus by default
-  Device::FocusFlags GetFocusFlags() const override { return Device::FocusFlags::IgnoreFocus; }
-
   int CountNumControls() const override { return 1; }
 
   void UpdateReferences(ControlEnvironment& env, bool is_input) override
