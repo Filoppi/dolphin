@@ -107,7 +107,7 @@ static std::vector<StateChangedCallbackFunc> s_on_state_changed_callbacks;
 static std::thread s_cpu_thread;
 static bool s_request_refresh_info = false;
 static bool s_is_throttler_temp_disabled = false;
-static double s_last_actual_emulation_speed = 1.0;
+static std::atomic<double> s_last_actual_emulation_speed{1.0};
 static bool s_frame_step = false;
 static std::atomic<bool> s_stop_frame_step;
 
