@@ -54,7 +54,7 @@ public:
   explicit QComboBoxWithMouseWheelDisabled(QWidget* parent = nullptr) : QComboBox(parent) {}
 
 protected:
-  // Consumes event while doing nothing
+  // Consumes event while doing nothing (the combo box will still scroll)
   void wheelEvent(QWheelEvent* event) override;
 };
 
