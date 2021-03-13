@@ -454,7 +454,7 @@ void IOWindow::CreateMainLayout()
          "retrive values,\nor even to share states between inputs and outputs.\nThey can only be "
          "shared between mappings\nof the same parent controller"));
   m_variables_combo->insertSeparator(m_variables_combo->count());
-  m_variables_combo->addItem(tr("Reset Values"));  // Add this even if we have no values
+  m_variables_combo->addItem(tr("Reset Values"));
   m_variables_combo->insertSeparator(m_variables_combo->count());
 
   // Devices
@@ -708,24 +708,25 @@ void IOWindow::ConnectWidgets()
           [this] { UpdateExpression(m_expression_text->toPlainText().toStdString()); });
 
   connect(m_variables_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
-    if (0 == index)
+    if (index == 0)
       return;
 
-    if (index == 2)  // Reset button. 1 and 3 are separators.
+    // Reset button. 1 and 3 are separators.
+    if (index == 2)
     {
       const auto lock = ControllerEmu::EmulatedController::GetStateLock();
       m_controller->ResetExpressionVariables();
     }
     else
     {
-      m_expression_text->insertPlainText(QStringLiteral("$") + m_variables_combo->currentText());
+      m_expression_text->insertPlainText(QLatin1Char('$') + m_variables_combo->currentText());
     }
 
     m_variables_combo->setCurrentIndex(0);
   });
 
   connect(m_operators_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
-    if (0 == index)
+    if (index == 0)
       return;
 
     m_expression_text->insertPlainText(m_operators_combo->currentText().left(1));
@@ -734,11 +735,11 @@ void IOWindow::ConnectWidgets()
   });
 
   connect(m_functions_combo, qOverload<int>(&QComboBox::activated), [this](int index) {
-    if (0 == index)
+    if (index == 0)
       return;
 
-    m_expression_text->insertPlainText(m_functions_combo->currentText() + QStringLiteral("(") +
-                                       m_functions_parameters[index - 1] + QStringLiteral(")"));
+    m_expression_text->insertPlainText(m_functions_combo->currentText() + QLatin1Char('(') +
+                                       m_functions_parameters[index - 1] + QLatin1Char(')'));
 
     m_functions_combo->setCurrentIndex(0);
   });
@@ -958,8 +959,8 @@ void IOWindow::UpdateExpression(std::string new_expression, UpdateMode mode)
   const auto status = m_reference->GetParseStatus();
   m_controller->UpdateSingleControlReference(g_controller_interface, m_reference);
   
-  // This is the only place where we need to update the shown user variables:
-  while (m_variables_combo->count() > 4)  // Keep the previous items
+  // This is the only place where we need to update the user variables. keep the first 4 items.
+  while (m_variables_combo->count() > 4)
   {
     m_variables_combo->removeItem(m_variables_combo->count() - 1);
   }

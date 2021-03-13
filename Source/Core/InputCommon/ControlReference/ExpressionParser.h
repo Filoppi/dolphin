@@ -146,9 +146,8 @@ class ControlEnvironment
 public:
   struct VariableState
   {
-    VariableState() : state(0), reference_counter(0) { }
-    ControlState state;
-    s32 reference_counter;
+    ControlState state = 0;
+    s32 reference_counter = 0;
   };
   using VariableContainer = std::map<std::string, VariableState>;
 
