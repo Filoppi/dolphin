@@ -371,9 +371,11 @@ void IOWindow::CreateMainLayout()
          "frames,\nwhich differ from video frames (the video refresh rate, not the game "
          "FPS).\nDon't try to mix input and output functions and expect them work.\nTheir state is "
          "updated even when emulation is not running and will carry over"));
-  // This might cause an empty unselectable whitespace at the end of the ComboBox selection
-  m_functions_combo->insertSeparator(m_functions_combo->count());  // A separator is also an item
-  m_functions_parameters.push_back(QStringLiteral(""));            // Keep the indexes aligned
+  // This might cause an empty unselectable whitespace at the end of the ComboBox selection.
+  // Given that a separator is also an item, we add an empty "func param" to keep indexes aligned.
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  //To change all single QStringLiteral to QLatin1Char
+  m_functions_parameters.push_back(QStringLiteral(""));
   if (m_type != Type::Output)
   {
     // Logic/Math:
@@ -842,8 +844,8 @@ void IOWindow::OnUIRangeChanged(int value)
 
 void IOWindow::OnRangeChanged()
 {
-  const int qt_value =
-      int(std::round(m_reference->range * RANGE_PERCENTAGE));  // Needed or it loses accuracy
+  // Rounding is needed or it loses accuracy
+  const int qt_value = int(std::round(m_reference->range * RANGE_PERCENTAGE));
   const int slider_range = std::max(m_range_slider->maximum(), std::abs(qt_value));
   // Increase the range of the slider if necessary, we don't want any limts
   m_range_slider->setRange(-slider_range, slider_range);
@@ -978,7 +980,8 @@ void IOWindow::UpdateExpression(std::string new_expression, UpdateMode mode)
   }
   else if (status == ciface::ExpressionParser::ParseStatus::EmptyExpression)
   {
-    m_parse_text->SetShouldPaintStateIndicator(m_reference->IsInput());  // Paint 0
+    // This will always paint 0
+    m_parse_text->SetShouldPaintStateIndicator(m_reference->IsInput());
     m_parse_text->setText(QString());
   }
   else if (status != ciface::ExpressionParser::ParseStatus::Successful)
