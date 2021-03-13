@@ -859,7 +859,11 @@ void IOWindow::OnRangeChanged()
 
 void IOWindow::UpdateOptionList()
 {
-  m_selected_device = g_controller_interface.FindDevice(m_devq);
+  {
+    // This might end up destroying an old device, and devices destruction needs the devices lock
+    const auto lock = g_controller_interface.GetDevicesLock();
+    m_selected_device = g_controller_interface.FindDevice(m_devq);
+  }
   m_option_list->setRowCount(0);
 
   if (m_selected_device == nullptr)
