@@ -356,7 +356,7 @@ void IOWindow::CreateMainLayout()
   {
     m_operators_combo->addItem(tr("^ Xor"));
     m_operators_combo->addItem(tr("= Assign"));
-    m_operators_combo->addItem(tr("$ Get variable"));
+    m_operators_combo->addItem(tr("$ User variable"));
     m_operators_combo->addItem(tr(", Comma"));
   }
 
