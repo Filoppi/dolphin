@@ -339,6 +339,12 @@ Device::Output* DeviceContainer::FindOutput(std::string_view name, const Device*
   return def_dev->FindOutput(name);
 }
 
+std::unique_lock<std::recursive_mutex> DeviceContainer::GetDevicesLock() const
+{
+  std::unique_lock<std::recursive_mutex> lock(m_devices_mutex);
+  return lock;
+}
+
 std::unique_lock<std::mutex> DeviceContainer::GetDevicesOutputLock() const
 {
   std::unique_lock<std::mutex> lock(m_devices_output_mutex);
