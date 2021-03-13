@@ -474,6 +474,7 @@ static void Restart()  // Also just start
   g_controller_interface.PlatformPopulateDevices([] { PopulateDevices(); });
 
   s_client_uid = Common::Random::GenerateValue<u32>();
+  s_next_listports_time = SteadyClock::now();
 
   if (s_servers_enabled && !s_servers.empty())
     StartHotplugThread();
