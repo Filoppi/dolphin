@@ -659,7 +659,6 @@ void IOWindow::ConfigChanged()
     m_devq = m_controller->GetDefaultDevice();
 
   UpdateDeviceList();
-  UpdateOptionList();
 }
 
 void IOWindow::Update()
@@ -765,7 +764,9 @@ void IOWindow::AppendSelectedOption()
 
 void IOWindow::OnDeviceChanged()
 {
-  m_devq.FromString(m_devices_combo->currentData().toString().toStdString());
+  const std::string device_name =
+      m_devices_combo->count() > 0 ? m_devices_combo->currentData().toString().toStdString() : "";
+  m_devq.FromString(device_name);
   UpdateOptionList();
 }
 
@@ -890,12 +891,14 @@ void IOWindow::UpdateDeviceList()
 {
   const QSignalBlocker blocker(m_devices_combo);
 
-  auto previous_name = m_devices_combo->currentData().toString().toStdString();
+  const auto previous_name = m_devices_combo->currentData().toString().toStdString();
 
   m_devices_combo->clear();
 
-  auto default_name = m_controller->GetDefaultDevice().ToString();
-  int prevuous_device_index = -1;
+  // Try to keep the previous selected device, otherwise fallback to default,
+  // or to the first device if there is no default.
+  const auto default_name = m_controller->GetDefaultDevice().ToString();
+  int previous_device_index = -1;
   int default_device_index = -1;
   for (const auto& name : g_controller_interface.GetAllDeviceStrings())
   {
@@ -908,25 +911,22 @@ void IOWindow::UpdateDeviceList()
     }
     if (name == previous_name)
     {
-      prevuous_device_index = m_devices_combo->count();
+      previous_device_index = m_devices_combo->count();
     }
     qname.append(QString::fromStdString(name));
     m_devices_combo->addItem(qname, QString::fromStdString(name));
   }
 
-  if (prevuous_device_index >= 0)
+  if (previous_device_index >= 0)
   {
-    m_devices_combo->setCurrentIndex(prevuous_device_index);
+    m_devices_combo->setCurrentIndex(previous_device_index);
   }
   else if (default_device_index >= 0)
   {
     m_devices_combo->setCurrentIndex(default_device_index);
   }
-  else
-  {
-    // Refresh to the first device
-    OnDeviceChanged();
-  }
+  // The device pointer might have changed so we need to force refresh it
+  OnDeviceChanged();
 }
 
 // Note that if the emulation is running while we are editing the expression,

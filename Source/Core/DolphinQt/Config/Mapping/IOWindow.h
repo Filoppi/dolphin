@@ -73,9 +73,9 @@ public:
                     ControlReference* ref, Type type, const QString& name,
                     ControllerEmu::NumericSettingBase* numeric_setting = nullptr);
 
+private:
   std::shared_ptr<ciface::Core::Device> GetSelectedDevice() const;
 
-private:
   void CreateMainLayout();
   void AddFunction(std::string function_name);
   void ConnectWidgets();
