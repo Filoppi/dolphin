@@ -91,7 +91,6 @@ private:
   public:
     std::string GetName() const override { return name; }
     Axis(ControlState scale, u8 index);
-    ControlState GetState() const override;
     FocusFlags GetFocusFlags() const override
     {
       return FocusFlags(u8(FocusFlags::RequireFocus) | u8(FocusFlags::RequireFullFocus));

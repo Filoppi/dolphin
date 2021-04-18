@@ -374,7 +374,7 @@ ControlState KeyboardMouse::Cursor::GetState() const
   return std::max(0.0, ControlState(*m_cursor) * (m_positive ? 1.0 : -1.0));
 }
 
-KeyboardMouse::Axis::Axis(ControlState scale, u8 index) : RelativeInput(scale), m_index(index){}
+KeyboardMouse::Axis::Axis(ControlState scale, u8 index) : RelativeInput(scale), m_index(index)
 {
   name = fmt::format("Axis {}{}", static_cast<char>('X' + m_index), (m_scale >= 0.0 ? '+' : '-'));
 }
