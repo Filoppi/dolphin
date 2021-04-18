@@ -21,12 +21,13 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <QTableWidget>
-#include <QTooltip>
+#include <QToolTip>
 #include <QVBoxLayout>
 
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 
+#include "DolphinQt/Config/Graphics/BalloonTip.h"
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 #include "DolphinQt/Config/Mapping/MappingIndicator.h"
 #include "DolphinQt/Config/Mapping/MappingWidget.h"
