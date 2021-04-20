@@ -36,7 +36,8 @@ constexpr auto SPURIOUS_TRIGGER_COMBO_THRESHOLD = std::chrono::milliseconds(150)
 
 QString GetExpressionForControl(const QString& control_name,
                                 const ciface::Core::DeviceQualifier& control_device,
-                                const ciface::Core::DeviceQualifier& default_device)
+                                const ciface::Core::DeviceQualifier& default_device,
+                                ExpressionType expression_type)
 {
   QString expr;
 
@@ -50,15 +51,18 @@ QString GetExpressionForControl(const QString& control_name,
   // append the control name
   expr += control_name;
 
-  // wrap around `
-  expr = QStringLiteral("`%1`").arg(expr);
+  if (expression_type == ExpressionType::QuoteOn)
+  {
+    // wrap around ` (bareword expressions might work anyway but we do it for consistency)
+    expr = QStringLiteral("`%1`").arg(expr);
+  }
 
   return expr;
 }
 
 QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& device_container,
                          const std::vector<std::string>& device_strings,
-                         const ciface::Core::DeviceQualifier& default_device)
+                         const ciface::Core::DeviceQualifier& default_device, ExpressionType expression_type)
 {
   const auto filter = new BlockUserInputFilter(button);
 
@@ -98,7 +102,7 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
 
   button->setText(old_text);
 
-  return BuildExpression(detections, default_device);
+  return BuildExpression(detections, default_device, expression_type);
 }
 
 void TestOutput(QPushButton* button, ciface::Core::DeviceContainer& device_container,
@@ -170,7 +174,7 @@ void RemoveSpuriousTriggerCombinations(
 
 QString
 BuildExpression(const std::vector<ciface::Core::DeviceContainer::InputDetection>& detections,
-                const ciface::Core::DeviceQualifier& default_device)
+                const ciface::Core::DeviceQualifier& default_device, ExpressionType expression_type)
 {
   std::vector<const ciface::Core::DeviceContainer::InputDetection*> pressed_inputs;
 
@@ -180,13 +184,16 @@ BuildExpression(const std::vector<ciface::Core::DeviceContainer::InputDetection>
     // Return the parent-most name if there is one for better hotkey strings.
     // Detection of L/R_Ctrl will be changed to just Ctrl.
     // Users can manually map L_Ctrl if they so desire.
-    const auto input = detection.device->GetParentMostInput(detection.input);
+    const auto input = (expression_type != ExpressionType::QuoteOffAndRedirectToParentInputOff) ?
+                           detection.device->GetParentMostInput(detection.input) :
+                           detection.input;
 
     ciface::Core::DeviceQualifier device_qualifier;
     device_qualifier.FromDevice(detection.device.get());
 
     return MappingCommon::GetExpressionForControl(QString::fromStdString(input->GetName()),
-                                                  device_qualifier, default_device);
+                                                  device_qualifier, default_device,
+                                                  expression_type);
   };
 
   bool new_alternation = false;

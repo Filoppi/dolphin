@@ -806,16 +806,17 @@ void IOWindow::OnDialogButtonPressed(QAbstractButton* button)
 
 void IOWindow::OnDetectButtonPressed()
 {
-  //To review: this one didn't redirect found inputs to their parents (CombinedInput)
-  const auto expression = MappingCommon::DetectExpression(m_detect_button, g_controller_interface,
-                                                          {m_devq.ToString()}, m_devq);
+  // In this case, we don't want input to be redirected to the parent input (e.g. LCTRL to combined CTRL)
+  const auto expression = MappingCommon::DetectExpression(
+      m_detect_button, g_controller_interface, {m_devq.ToString()}, m_devq,
+      MappingCommon::ExpressionType::QuoteOffAndRedirectToParentInputOff);
 
   if (expression.isEmpty())
     return;
 
   const auto list = m_option_list->findItems(expression, Qt::MatchFixedString);
 
-  // Note that if this fails, the last selected item would still appear as such
+  // Try to select the first. If this fails, the last selected item would still appear as such
   if (!list.empty())
     m_option_list->setCurrentItem(list[0]);
 }
