@@ -405,7 +405,7 @@ void IOWindow::CreateMainLayout()
     AddFunction("onTap");
     AddFunction("cache");
     AddFunction("toggle");
-    AddFunction("toRelative");
+    AddFunction("sharedRelative");
     AddFunction("relativeToSpeed");
     AddFunction("smooth");
     AddFunction("pulse");

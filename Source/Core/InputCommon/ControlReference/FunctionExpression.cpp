@@ -828,8 +828,8 @@ private:
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Gradually moves its internal value toward its target value (input). It asks to "
-                  "specify the times to go between 0 and 1");
+    return _trans("Gradually moves its internal value toward its target value (input). It asks for "
+                  "the times to go between 0 and 1. Can be used to simulate a relative axis");
   }
 
   ControlState GetValue() const override
@@ -1186,9 +1186,8 @@ private:
   mutable Clock::time_point m_start_time = Clock::now();
 };
 
-//To review this in general, it breaks with a button
-// usage: toRelative(input, speed = 0, max_abs_value = 1, [shared_state])
-class ToRelativeExpression : public FunctionExpression
+// usage: sharedRelative(input, speed = 0, max_abs_value = 1, [shared_state])
+class SharedRelativeExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
@@ -1203,8 +1202,8 @@ private:
   const char* GetDescription(bool for_input) const override
   {
     return _trans(
-        "Returns the relative change of an input, clamped by speed per second if it's > 0. You can "
-        "add a shared state with $unique_name so you can link functions from multiple mappings");
+        "Adds the value of an input to a state, multiplied by a speed per second if it's > 0. You"
+        " can add a shared state with $unique_name to link functions from two opposite mappings");
   }
 
   ControlState GetValue() const override
@@ -1222,6 +1221,8 @@ private:
     // This mapping (for down) returns the negative value clamped between 0.0 and 1.0
     // (Adjustments created by `Down` are applied negatively to the shared state)
     //  relative(`Down`, 2.0, -1.0, $y)
+    //
+    // Note that this won't work if directly mapped to a single button as it won't go back.
 
     const ControlState input = GetArg(0).GetValue();
     const ControlState speed = (GetArgCount() >= 2) ? GetArg(1).GetValue() : 0.0;
@@ -1233,14 +1234,14 @@ private:
       m_state = GetArg(3).GetValue();
 
     const ControlState max_move =
-        input *
-        ((speed > 0.0) ? (ControllerInterface::GetCurrentInputDeltaSeconds() * speed) : 1.0);
-    const ControlState diff_from_zero = std::abs(0.0 - m_state);
+        input * (speed > 0.f ? (ControllerInterface::GetCurrentInputDeltaSeconds() * speed) : 1.0);
+    const ControlState diff_from_zero = std::abs(m_state);
     const ControlState diff_from_max = std::abs(max_abs_value - m_state);
 
     m_state += std::min(std::max(max_move, -diff_from_zero), diff_from_max) *
                std::copysign(1.0, max_abs_value);
 
+    // Break const correctness but GetValue() is kind of meant like an update method now
     if (GetArgCount() >= 4)
       const_cast<Expression&>(GetArg(3)).SetValue(m_state);
 
@@ -1632,11 +1633,12 @@ std::unique_ptr<FunctionExpression> MakeFunctionExpression(std::string_view name
     return std::make_unique<ToggleExpression>();
   if (name == "onTap" || name == "tap")
     return std::make_unique<OnTapExpression>();
-  if (name == "toRelative" || name == "relative")
-    return std::make_unique<ToRelativeExpression>();
+  // It would be nice to remove the old name "relative" from here but we'd break existing functions
+  if (name == "sharedRelative" || name == "relative")
+    return std::make_unique<SharedRelativeExpression>();
   if (name == "relativeToSpeed")
     return std::make_unique<RelativeToSpeedExpression>();
-  if (name == "smooth")
+  if (name == "smooth" || name == "toRelative")
     return std::make_unique<SmoothExpression>();
   if (name == "pulse")
     return std::make_unique<PulseExpression>();
