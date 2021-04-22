@@ -599,27 +599,34 @@ private:
   mutable std::vector<ControlState> m_cached_states;
 };
 
-// usage: timer(seconds)
+// usage: timer(seconds, reset = false)
 class TimerExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 1)
+    if (args.size() == 1 || args.size() == 2)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"seconds"};
+      return ExpectedArguments{"seconds, reset = false"};
   }
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Returns the progress to reach the specified time. Loops around once reached");
+    return _trans("Returns the progress to reach the specified time (you can change it on the go "
+                  "to change the progress speed). Loops around once reached");
   }
 
   ControlState GetValue() const override
   {
     const ControlState seconds = GetArg(0).GetValue();
+    const bool reset = GetArgCount() == 2 ? (GetArg(1).GetValue() > CONDITION_THRESHOLD) : false;
+
+    if (reset)
+    {
+      m_progress = 0.0;
+    }
 
     if (seconds <= 0.0)
     {
@@ -1291,29 +1298,31 @@ private:
   }
 };
 
-// usage: pulse(input, seconds)
+// usage: pulse(input, seconds, accumulate = true)
 class PulseExpression : public FunctionExpression
 {
 private:
   ArgumentValidation
   ValidateArguments(const std::vector<std::unique_ptr<Expression>>& args) override
   {
-    if (args.size() == 2)
+    if (args.size() == 2 || args.size() == 3)
       return ArgumentsAreValid{};
     else
-      return ExpectedArguments{"input, seconds"};
+      return ExpectedArguments{"input, seconds, accumulate = true"};
   }
 
   const char* GetDescription(bool for_input) const override
   {
-    return _trans("Keeps the value true for \"seconds\" (increasingly) every time the input starts "
-                  "being true");
+    return _trans("Keeps the value true for \"seconds\" (increasingly if asked) every time the "
+                  "input starts being true");
   }
 
   ControlState GetValue() const override
   {
     const ControlState input = GetArg(0).GetValue();
     const ControlState seconds = GetArg(1).GetValue();
+    const bool accumulate =
+        GetArgCount() == 3 ? (GetArg(2).GetValue() > CONDITION_THRESHOLD) : true;
 
     if (input <= CONDITION_THRESHOLD)
     {
@@ -1325,7 +1334,10 @@ private:
 
       if (m_state)
       {
-        m_release_time += seconds;
+        if (accumulate)
+          m_release_time += seconds;
+        else
+          m_release_time = seconds;
       }
       else
       {
