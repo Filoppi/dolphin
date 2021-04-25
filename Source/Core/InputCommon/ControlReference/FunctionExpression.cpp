@@ -15,7 +15,6 @@
 #include <chrono>
 #include <cmath>
 
-#pragma optimize("", off) //To delete both
 namespace ciface::ExpressionParser
 {
 using Clock = std::chrono::steady_clock;
@@ -1760,4 +1759,3 @@ void FunctionExpression::SetValue(ControlState value)
   }
 }
 }  // namespace ciface::ExpressionParser
-#pragma optimize("", on)
