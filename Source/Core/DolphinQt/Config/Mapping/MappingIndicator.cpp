@@ -258,7 +258,8 @@ bool IsPointOutsideCalibration(Common::DVec2 point, ControllerEmu::ReshapableInp
   const double input_radius = input.GetInputRadiusAtAngle(
       std::atan2(point.y - center.y, point.x - center.x) + MathUtil::TAU);
 
-  constexpr double ALLOWED_ERROR = 1.0;
+  // This is to avoid the calibration widget turning red in case of a slight miscalibration
+  constexpr double ALLOWED_ERROR = 1.175;
 
   return current_radius > input_radius * ALLOWED_ERROR;
 }
