@@ -84,14 +84,14 @@ using UndetectableSignedAnalogInput = SignedInput<false>;
 class Motor final : public Core::Device::Output
 {
 public:
-  Motor(ControlState* value) : m_value(*value) {}
+  Motor(std::atomic<ControlState>* value) : m_value(*value) {}
 
   std::string GetName() const override { return "Motor"; }
 
 private:
   void SetStateInternal(ControlState state) override { m_value = state; }
 
-  ControlState& m_value;
+  std::atomic<ControlState>& m_value;
 };
 
 template <typename T>
@@ -1376,7 +1376,8 @@ void Device::UpdateRumble()
 {
   static constexpr auto rumble_period = std::chrono::milliseconds(100);
 
-  const auto on_time = std::chrono::duration_cast<Clock::duration>(rumble_period * m_rumble_level);
+  const auto on_time =
+      std::chrono::duration_cast<Clock::duration>(rumble_period * m_rumble_level.load());
   const auto off_time = rumble_period - on_time;
 
   const auto now = Clock::now();
