@@ -13,10 +13,9 @@
 
 #include "Common/Common.h"
 #include "Common/MathUtil.h"
+#include "Core/Core.h"
 
-#include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
-#include "InputCommon/ControllerEmu/Control/Input.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
@@ -26,8 +25,7 @@ namespace ControllerEmu
 using milli_with_remainder = std::chrono::duration<double, std::milli>;
 
 Cursor::Cursor(std::string name_, std::string ui_name_)
-    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor),
-      m_last_ui_update(Clock::now())
+    : ReshapableInput(std::move(name_), std::move(ui_name_), GroupType::Cursor)
 {
   for (auto& named_direction : named_directions)
     AddInput(Translate, named_direction);
@@ -65,13 +63,6 @@ Cursor::Cursor(std::string name_, std::string ui_name_)
              20, 0, 360);
 
   AddSetting(&m_relative_setting, {_trans("Relative Input")}, false);
-  const NumericSetting<bool>* edit_condition =
-      static_cast<NumericSetting<bool>*>(numeric_settings.back().get());
-  AddSetting(&m_relative_absolute_time_setting,
-             {_trans("Relative Input Absolute Time"), _trans(""),
-              _trans("Enable if you are using a relative input device (e.g. mouse axis, touch "
-                     "surface),\nit will make it independent from the emulation speed.")},
-             false, false, true, edit_condition);
   AddSetting(&m_autohide_setting, {_trans("Auto-Hide")}, false);
 }
 
@@ -95,27 +86,11 @@ ControlState Cursor::GetGateRadiusAtAngle(double ang) const
 }
 
 // TODO: pass in the state as reference and let wiimote and UI keep their own state.
-Cursor::StateData Cursor::GetState(bool is_ui, float absolute_time_elapsed)
+Cursor::StateData Cursor::GetState(bool is_ui, float time_elapsed)
 {
   const int i = is_ui ? 1 : 0;
 
   const auto input = GetReshapableState(true);
-
-  double ms_since_update;
-  // The UI updates at arbitrary refresh rates which aren't syncronized with devices updates
-  // so we need to calculate the time outselves. While if we are in game, we can just use the
-  // time of the controller interface channel, which is more reliable.
-  if (is_ui)
-  {
-    const auto now = Clock::now();
-    ms_since_update =
-        std::chrono::duration_cast<milli_with_remainder>(now - m_last_ui_update).count();
-    m_last_ui_update = now;
-  }
-  else
-  {
-    ms_since_update = g_controller_interface.GetCurrentRealInputDeltaSeconds() * 1000.0;
-  }
 
   // Relative input (the second check is for Hold):
   if (m_relative_setting.GetValue() ^ controls[6]->GetState<bool>())
@@ -128,17 +103,12 @@ Cursor::StateData Cursor::GetState(bool is_ui, float absolute_time_elapsed)
     }
     else
     {
-      // If we are using a mouse axis to drive the cursor (there are reasons to), we want the
-      // step to be independent from the emu speed, otherwise it would move at a different speed
-      // depending on it.
-      // In other words, we want to be indipendent from time, and just use it as an absolute cursor.
-      // Of course if the emulation can't keep up with full speed, absolute time won't be accurate.
-      // Also the chrono timer as of now is extremely unstable between frames,
-      // so it add quite a lot of imprecision.
-      const bool use_absolute_time =
-          m_relative_absolute_time_setting.GetValue() && absolute_time_elapsed >= 0.f;
-      const double step =
-          STEP_PER_SEC * (use_absolute_time ? absolute_time_elapsed : (ms_since_update / 1000.0));
+      // Here we have two choices: to divide by the emulation speed or not.
+      // The first one would be good if the relative input is mapped to buttons
+      // or an analog stick, the second one would be good for a mouse or touch pad.
+      // In general, this is more likely to be mapped to a mouse, but if not, users
+      // can always use input expressions to pre-divide their input by the emu speed.
+      const double step = STEP_PER_SEC * time_elapsed;
 
       m_state[i].x += input.x * step;
       m_state[i].y += input.y * step;
@@ -159,24 +129,28 @@ Cursor::StateData Cursor::GetState(bool is_ui, float absolute_time_elapsed)
   m_state[i].y = std::clamp(m_state[i].y, -1.0, 1.0);
 
   StateData result = m_state[i];
-  m_prev_state[i] = result;
 
   const bool autohide = m_autohide_setting.GetValue();
+  const bool has_moved = std::abs(m_prev_state[i].x - result.x) > AUTO_HIDE_DEADZONE ||
+                         std::abs(m_prev_state[i].y - result.y) > AUTO_HIDE_DEADZONE;
 
   // Auto-hide timer (ignores Z):
-  if (!autohide || std::abs(m_prev_state[i].x - result.x) > AUTO_HIDE_DEADZONE ||
-      std::abs(m_prev_state[i].y - result.y) > AUTO_HIDE_DEADZONE)
+  if (!autohide || has_moved)
   {
     m_auto_hide_timer[i] = AUTO_HIDE_MS;
   }
-  else if (m_auto_hide_timer[i])
+  if (autohide && !has_moved && m_auto_hide_timer[i] > 0)
   {
-    // Auto hide is based on real world time, doesn't depend on emulation time/speed
-    m_auto_hide_timer[i] -= std::min<int>(ms_since_update, m_auto_hide_timer[i]);
+    // Auto should be based on real world time, independent of emulation speed
+    const float emulation_speed = is_ui ? 1.f : static_cast<float>(Core::GetActualEmulationSpeed());
+    m_auto_hide_timer[i] -= static_cast<int>((time_elapsed * 1000.f) / emulation_speed);
+    m_auto_hide_timer[i] = std::max(m_auto_hide_timer[i], 0);
   }
 
+  m_prev_state[i] = result;
+
   // If auto-hide time is up or hide button is held:
-  if (!m_auto_hide_timer[i] || controls[4]->GetState<bool>())
+  if (m_auto_hide_timer[i] <= 0 || controls[4]->GetState<bool>())
   {
     result.x = std::numeric_limits<ControlState>::quiet_NaN();
     result.y = 0;
@@ -193,9 +167,6 @@ void Cursor::ResetState(bool is_ui)
   m_prev_state[i] = {};
 
   m_auto_hide_timer[i] = AUTO_HIDE_MS;
-
-  if (is_ui)
-    m_last_ui_update = Clock::now();
 }
 
 ControlState Cursor::GetTotalYaw() const

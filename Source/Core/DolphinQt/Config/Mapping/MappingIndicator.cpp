@@ -310,7 +310,7 @@ void CursorIndicator::Draw()
   // Theoretically this should be updated at the same rate input devices are updated if using
   // the relative setting, otherwise some relative movements would be lost and some read twice, but
   // it's not a big deal, being UI only.
-  const auto adj_coord = m_cursor_group.GetState(true);
+  const auto adj_coord = m_cursor_group.GetState(true, 1.f / GetUpdateFrequency());
 
   // TODO: the calibration widget makes no sense when the cursor is in relative mode (it turns red)
   DrawReshapableInput(m_cursor_group, CURSOR_TV_COLOR,
