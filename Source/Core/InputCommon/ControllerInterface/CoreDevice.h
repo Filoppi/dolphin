@@ -92,6 +92,8 @@ public:
     // user didn't want the application to react. It basically blocks them until release,
     // meaning they will return 0. Ignored on outputs because it just isn't necessary.
     // Shouldn't be used without RequireFocus or RequireFullFocus.
+    // Note that this won't 100% work with "Pause On Focus Loss" due to the ControlReference
+    // gate not updating when the emulation is not running.
     IgnoreOnFocusChanged = 0x04,
     // Forces the control to pass even if we have no focus, useful for things like battery level.
     // This is not 0 because it needs higher priority over other flags.
@@ -173,7 +175,7 @@ public:
       state.relative_state = 0.0;
       state.initialized = false;
     }
-    // Different input channels are never updated cuncurrently so you can
+    // Different input channels are never updated concurrently so you can
     // safely call this the first time your devices loses/resets its absolute value
     void ResetAllStates()
     {

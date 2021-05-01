@@ -4,7 +4,6 @@
 
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 
-#include <tuple>
 #include <vector>
 
 #include <QApplication>

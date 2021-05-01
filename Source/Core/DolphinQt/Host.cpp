@@ -75,7 +75,7 @@ void Host::SetMainWindowHandle(void* handle)
 bool Host::GetRenderFocus()
 {
 #ifdef _WIN32
-  // Unfortunately QT calls SetRenderFocus() with a slight delay compared to what we actually need
+  // Unfortunately Qt calls SetRenderFocus() with a slight delay compared to what we actually need
   // to avoid inputs that causes a focus loss to be processed by the emulation
   if (m_render_to_main)
     return GetForegroundWindow() == (HWND)m_main_window_handle.load();

@@ -205,6 +205,8 @@ void HotkeyScheduler::Run()
     if (Core::GetState() != Core::State::Stopping)
     {
       // Obey window focus (config permitting) before checking hotkeys.
+      // Note that hotkeys, like emulated controllers, check the render widget focus,
+      // not the main window focus. This is kind of a limitation but it's fine for now.
       ControlReference::UpdateGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS), false, true,
                                    ciface::InputChannel::Host);
 

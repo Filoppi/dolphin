@@ -566,7 +566,7 @@ void Init()
   ConfigChanged();  // Call it immediately to load settings
 }
 
-// This can be called by the host thread as well as the hotplug thread, cuncurrently.
+// This can be called by the host thread as well as the hotplug thread, concurrently.
 // So use PlatformPopulateDevices().
 // s_servers is already safe because it can only be modified when the DSU thread is not running,
 // from the main thread

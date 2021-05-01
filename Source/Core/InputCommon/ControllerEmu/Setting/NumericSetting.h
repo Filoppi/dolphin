@@ -110,7 +110,7 @@ public:
         m_min_value(min_value), m_max_value(max_value), m_edit_condition(edit_condition)
   {
     ASSERT(m_max_value >= m_min_value);  // Let them be equal
-    // Theoretically not needed but avoid log errors
+    // Theoretically not needed but avoids log errors
     const auto lock = EmulatedController::GetStateLock();
     m_value.SetValue(m_default_value);
   }
