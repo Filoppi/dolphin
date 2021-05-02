@@ -210,7 +210,7 @@ private:
 public:
   Button() : m_state(BUTTON_RELEASED) {}
   void SetState(ButtonState state) { m_state = state; }
-  bool Pressed() { return m_state == BUTTON_PRESSED; }
+  bool Pressed() const { return m_state == BUTTON_PRESSED; }
   ~Button() {}
 };
 class Axis
@@ -221,7 +221,7 @@ private:
 public:
   Axis() : m_value(0.0f) {}
   void SetValue(float value) { m_value = value; }
-  float AxisValue() { return m_value; }
+  float AxisValue() const { return m_value; }
   ~Axis() {}
 };
 
@@ -263,18 +263,18 @@ public:
   }
   bool PressEvent(int button, int action);
   void AxisEvent(int axis, float value);
-  bool ButtonValue(int pad_id, ButtonType button);
-  float AxisValue(int pad_id, ButtonType axis);
+  bool ButtonValue(int pad_id, ButtonType button) const;
+  float AxisValue(int pad_id, ButtonType axis) const;
 };
 
 void Init(const std::string&);
 
 // pad_id is numbered 0 to 3 for GC pads and 4 to 7 for Wiimotes
-bool GetButtonPressed(int pad_id, ButtonType button);
-float GetAxisValue(int pad_id, ButtonType axis);
+bool GetButtonPressed(int pad_id, ButtonType button) const;
+float GetAxisValue(int pad_id, ButtonType axis) const;
 
 // emu_pad_id is numbered 0 to 3 for both GC pads and Wiimotes
-double GetInputRadiusAtAngle(int emu_pad_id, ButtonType stick, double angle);
+double GetInputRadiusAtAngle(int emu_pad_id, ButtonType stick, double angle) const;
 
 bool GamepadEvent(const std::string& dev, int button, int action);
 void GamepadAxisEvent(const std::string& dev, int axis, float value);

@@ -675,7 +675,7 @@ void Init(const std::string& game_id)
   }
 }
 
-bool GetButtonPressed(int pad_id, ButtonType button)
+bool GetButtonPressed(int pad_id, ButtonType button) const
 {
   bool pressed = m_controllers[TOUCHSCREEN_KEY]->ButtonValue(pad_id, button);
 
@@ -685,7 +685,7 @@ bool GetButtonPressed(int pad_id, ButtonType button)
   return pressed;
 }
 
-float GetAxisValue(int pad_id, ButtonType axis)
+float GetAxisValue(int pad_id, ButtonType axis) const
 {
   float value = m_controllers[TOUCHSCREEN_KEY]->AxisValue(pad_id, axis);
   if (value == 0.0f)
@@ -700,7 +700,7 @@ float GetAxisValue(int pad_id, ButtonType axis)
   return value;
 }
 
-double GetInputRadiusAtAngle(int pad_id, ButtonType stick, double angle)
+double GetInputRadiusAtAngle(int pad_id, ButtonType stick, double angle) const
 {
   // To avoid a crash, don't access controllers before they've been initialized by the boot process
   if (!Core::IsRunningAndStarted())
@@ -787,7 +787,7 @@ void InputDevice::AxisEvent(int axis, float value)
   }
 }
 
-bool InputDevice::ButtonValue(int pad_id, ButtonType button)
+bool InputDevice::ButtonValue(int pad_id, ButtonType button) const
 {
   const auto& binding = m_input_binds.find(std::make_pair(pad_id, button));
   if (binding == m_input_binds.end())
@@ -799,7 +799,7 @@ bool InputDevice::ButtonValue(int pad_id, ButtonType button)
     return (m_axises[binding->second->m_button_type] * binding->second->m_neg) > 0.5f;
 }
 
-float InputDevice::AxisValue(int pad_id, ButtonType axis)
+float InputDevice::AxisValue(int pad_id, ButtonType axis) const
 {
   const auto& binding = m_input_binds.find(std::make_pair(pad_id, axis));
   if (binding == m_input_binds.end())
