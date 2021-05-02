@@ -665,7 +665,9 @@ void SetState(State state)
     g_controller_interface.SetChannelRunning(ciface::InputChannel::SerialInterface, false);
     g_controller_interface.SetChannelRunning(ciface::InputChannel::Bluetooth, false);
     Wiimote::Pause();
+#if defined(__LIBUSB__)
     GCAdapter::ResetRumble();
+#endif
     s_timer.Update();
     break;
   case State::Running:

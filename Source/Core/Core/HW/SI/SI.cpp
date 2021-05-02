@@ -22,7 +22,6 @@
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/HW/SI/SI_DeviceGBA.h"
 #include "Core/HW/SystemTimers.h"
-#include "Core/HW/VideoInterface.h"
 #include "Core/Movie.h"
 #include "Core/NetPlayProto.h"
 

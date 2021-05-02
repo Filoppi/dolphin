@@ -203,6 +203,8 @@ static int s_wakeup_eventfd;
 // There is no easy way to get the device name from only a dev node
 // during a device removed event, since libevdev can't work on removed devices;
 // sysfs is not stable, so this is probably the easiest way to get a name for a node.
+// TODO: make thread safe, as of now pairs could be added to it as they are being removed,
+// as devices can be destroyed by any thread at any time.
 static std::map<std::string, std::weak_ptr<evdevDevice>> s_devnode_objects;
 
 static std::shared_ptr<evdevDevice>
@@ -259,8 +261,6 @@ static void AddDeviceNode(const char* devnode)
 
     evdev_device->AddNode(devnode, fd, dev);
 
-    s_devnode_objects.emplace(devnode, std::move(evdev_device));
-
     // Remove and re-add device as naming and inputs may have changed.
     // This will also give it the correct index and invoke device change callbacks.
     // Make sure to force the device removal immediately (as they are shared ptrs and
@@ -279,11 +279,11 @@ static void AddDeviceNode(const char* devnode)
 
     const bool was_interesting = evdev_device->AddNode(devnode, fd, dev);
 
-    s_devnode_objects.emplace(devnode, std::move(evdev_device));
-
     if (was_interesting)
       g_controller_interface.AddDevice(evdev_device);
   }
+
+  s_devnode_objects.emplace(devnode, std::move(evdev_device));
 }
 
 static void HotplugThreadFunc()

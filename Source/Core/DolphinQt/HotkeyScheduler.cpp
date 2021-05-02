@@ -25,15 +25,8 @@
 #include "Core/HW/GCPad.h"
 #include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/Wiimote.h"
-#include "Core/Host.h"
 #include "Core/HotkeyManager.h"
-#include "Core/IOS/IOS.h"
-#include "Core/IOS/USB/Bluetooth/BTBase.h"
 #include "Core/IOS/USB/Bluetooth/BTReal.h"
-#include "Core/HW/Wiimote.h"
-#include "Core/HW/SI/SI_Device.h"
-#include "Core/HW/GCPad.h"
-#include "Core/HW/GCKeyboard.h"
 #include "Core/State.h"
 #include "Core/WiiUtils.h"
 
@@ -44,7 +37,6 @@
 
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/RenderBase.h"
-#include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoConfig.h"
 
 constexpr const char* DUBOIS_ALGORITHM_SHADER = "dubois";
@@ -149,6 +141,7 @@ void HotkeyScheduler::Run()
 {
   Common::SetCurrentThreadName("HotkeyScheduler");
 
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::FreeLook, true);
   g_controller_interface.SetChannelRunning(ciface::InputChannel::Host, true);
 
   while (!m_stop_requested.IsSet())
@@ -633,6 +626,7 @@ void HotkeyScheduler::Run()
       emit StateSaveFile();
   }
 
+  g_controller_interface.SetChannelRunning(ciface::InputChannel::Host, false);
   g_controller_interface.SetChannelRunning(ciface::InputChannel::Host, false);
 }
 

@@ -314,7 +314,7 @@ void WiimoteControllersWidget::LoadSettings()
   else
     m_wiimote_emu->setChecked(true);
 
-  UpdateDisabledWiimoteControls();
+  OnWiimoteModeChanged();
 }
 
 void WiimoteControllersWidget::SaveSettings()

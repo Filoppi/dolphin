@@ -43,8 +43,8 @@ enum class GateFlags : u8
 
 // Gate is "open" by default.
 static thread_local GateFlags tls_gate_flags[u8(ciface::InputChannel::Max)] = {
-    GateFlags::Ignore, GateFlags::Ignore, GateFlags::Ignore};
-static_assert(u8(ciface::InputChannel::Max) == 3);  // Add initialization to Ignore
+    GateFlags::Ignore, GateFlags::Ignore, GateFlags::Ignore, GateFlags::Ignore};
+static_assert(u8(ciface::InputChannel::Max) == 4);  // Add initialization to Ignore
 static thread_local u8 tls_gate_channel = u8(ciface::InputChannel::Host);
 
 // InputReference(s)* never change, they are all created on startup before ever being read.
