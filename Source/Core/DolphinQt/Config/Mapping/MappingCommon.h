@@ -23,19 +23,17 @@ enum class Quote
 
 QString GetExpressionForControl(const QString& control_name,
                                 const ciface::Core::DeviceQualifier& control_device,
-                                const ciface::Core::DeviceQualifier& default_device,
-                                Quote quote = Quote::On);
+                                const ciface::Core::DeviceQualifier& default_device);
 
 QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& device_container,
                          const std::vector<std::string>& device_strings,
-                         const ciface::Core::DeviceQualifier& default_device,
-                         Quote quote = Quote::On);
+                         const ciface::Core::DeviceQualifier& default_device);
 
 void TestOutput(QPushButton* button, OutputReference* reference);
 
 void RemoveSpuriousTriggerCombinations(std::vector<ciface::Core::DeviceContainer::InputDetection>*);
 
 QString BuildExpression(const std::vector<ciface::Core::DeviceContainer::InputDetection>&,
-                        const ciface::Core::DeviceQualifier& default_device, Quote quote);
+                        const ciface::Core::DeviceQualifier& default_device);
 
 }  // namespace MappingCommon

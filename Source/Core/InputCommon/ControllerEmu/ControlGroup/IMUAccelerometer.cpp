@@ -7,8 +7,8 @@
 #include <memory>
 
 #include "Common/Common.h"
-#include "Core/HW/WiimoteEmu/WiimoteEmu.h"
 #include "InputCommon/ControlReference/ControlReference.h"
+#include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
 #include "InputCommon/ControllerEmu/Control/Input.h"
 
@@ -25,9 +25,16 @@ IMUAccelerometer::IMUAccelerometer(std::string name_, std::string ui_name_)
   AddInput(Translate, _trans("Backward"));
 }
 
+bool IMUAccelerometer::AreInputsBound() const
+{
+  return controls[0]->control_ref->BoundCount() && controls[1]->control_ref->BoundCount() &&
+         controls[2]->control_ref->BoundCount() && controls[3]->control_ref->BoundCount() &&
+         controls[4]->control_ref->BoundCount() && controls[5]->control_ref->BoundCount();
+}
+
 std::optional<IMUAccelerometer::StateData> IMUAccelerometer::GetState() const
 {
-  if (controls[0]->control_ref->BoundCount() == 0)
+  if (!AreInputsBound())
     return std::nullopt;
 
   StateData state;

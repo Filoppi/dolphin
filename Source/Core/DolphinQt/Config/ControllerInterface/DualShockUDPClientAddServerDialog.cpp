@@ -6,8 +6,7 @@
 
 #include <fmt/format.h>
 
-#include <QButtonGroup>
-#include <QDialog>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QLabel>
@@ -30,7 +29,7 @@ DualShockUDPClientAddServerDialog::DualShockUDPClientAddServerDialog(QWidget* pa
 
 void DualShockUDPClientAddServerDialog::CreateWidgets()
 {
-  setWindowTitle(tr("Add New DSU Server"));
+  setWindowTitle(tr("Add DSU Server"));
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
   m_main_layout = new QGridLayout;
@@ -47,12 +46,24 @@ void DualShockUDPClientAddServerDialog::CreateWidgets()
   m_server_port->setMaximum(65535);
   m_server_port->setValue(ciface::DualShockUDPClient::DEFAULT_SERVER_PORT);
 
+  m_type = new QComboBox();
+  m_type->setToolTip(tr(
+      "This will be exclusived used for input names,\nwhich aren't guaranteed to be right for "
+      "non DS4/DualSense controllers\nor if the DSU source uses remapping.\nDifferent DSU profile "
+      "types also won't be compatible with each other"));
+  m_type->addItem(tr("DualShock 4"), QStringLiteral("DS4"));
+  m_type->addItem(tr("DualSense"), QStringLiteral("DualSense"));
+  m_type->addItem(tr("Switch"), QStringLiteral("Switch"));
+  m_type->addItem(tr("Generic"), QStringLiteral("Generic"));
+
   m_main_layout->addWidget(new QLabel(tr("Description")), 1, 0);
   m_main_layout->addWidget(m_description, 1, 1);
   m_main_layout->addWidget(new QLabel(tr("Server IP Address")), 2, 0);
   m_main_layout->addWidget(m_server_address, 2, 1);
   m_main_layout->addWidget(new QLabel(tr("Server Port")), 3, 0);
   m_main_layout->addWidget(m_server_port, 3, 1);
+  m_main_layout->addWidget(new QLabel(tr("Type")), 4, 0);
+  m_main_layout->addWidget(m_type, 4, 1);
 
   m_buttonbox = new QDialogButtonBox();
   auto* add_button = new QPushButton(tr("Add"));
@@ -64,16 +75,19 @@ void DualShockUDPClientAddServerDialog::CreateWidgets()
   connect(cancel_button, &QPushButton::clicked, this, &DualShockUDPClientAddServerDialog::reject);
   add_button->setDefault(true);
 
-  m_main_layout->addWidget(m_buttonbox, 4, 0, 1, 2);
+  m_main_layout->addWidget(m_buttonbox, 5, 0, 1, 2);
 }
 
 void DualShockUDPClientAddServerDialog::OnServerAdded()
 {
   const auto& servers_setting = Config::Get(ciface::DualShockUDPClient::Settings::SERVERS);
-  Config::SetBaseOrCurrent(ciface::DualShockUDPClient::Settings::SERVERS,
-                           servers_setting + fmt::format("{}:{}:{};",
-                                                         m_description->text().toStdString(),
-                                                         m_server_address->text().toStdString(),
-                                                         m_server_port->value()));
+  // We can't calibrate them now because the input device don't exist yet, it's not connected,
+  // so just pass in empty calibration information, users will be able to calibrate themselves,
+  // or default calibration will be used.
+  Config::SetBaseOrCurrent(
+      ciface::DualShockUDPClient::Settings::SERVERS,
+      servers_setting + fmt::format("{}:{}:{}:{};", m_description->text().toStdString(),
+                                    m_server_address->text().toStdString(), m_server_port->value(),
+                                    m_type->currentData().toString().toStdString()));
   accept();
 }

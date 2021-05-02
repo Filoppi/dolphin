@@ -38,7 +38,7 @@ private:
     void UpdateOutput();
     void Release();
 
-    void SetState(ControlState state) override;
+    void SetStateInternal(ControlState state) override;
     std::string GetName() const override;
 
   protected:

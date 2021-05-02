@@ -24,7 +24,7 @@
 #include "InputCommon/GCPadStatus.h"
 
 // clang-format off
-constexpr std::array<const char*, 125> s_hotkey_labels{{
+constexpr std::array<const char*, 126> s_hotkey_labels{{
     _trans("Open"),
     _trans("Change Disc"),
     _trans("Eject Disc"),
@@ -35,6 +35,7 @@ constexpr std::array<const char*, 125> s_hotkey_labels{{
     _trans("Toggle Fullscreen"),
     _trans("Take Screenshot"),
     _trans("Exit"),
+    _trans("Unlock Cursor"),
     _trans("Activate NetPlay Chat"),
     _trans("Control NetPlay Golf Mode"),
 
@@ -258,6 +259,7 @@ static void LoadLegacyConfig(ControllerEmu::EmulatedController* controller)
           {
             std::string expression;
             sec->Get(key, &expression, "");
+            const auto lock = ControllerEmu::EmulatedController::GetStateLock();
             control->control_ref->SetExpression(std::move(expression));
           }
         }
@@ -361,7 +363,8 @@ std::string HotkeyManager::GetName() const
 
 void HotkeyManager::GetInput(HotkeyStatus* const kb)
 {
-  const auto lock = GetStateLock();
+  CacheInput();
+
   for (std::size_t group = 0; group < s_groups_info.size(); group++)
   {
     const int group_count = (s_groups_info[group].last - s_groups_info[group].first) + 1;
@@ -396,6 +399,8 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
 {
   EmulatedController::LoadDefaults(ciface);
 
+  const auto lock = GetStateLock();
+
   auto set_key_expression = [this](int index, const std::string& expression) {
     m_keys[FindGroupByID(index)]
         ->controls[GetIndexForGroup(FindGroupByID(index), index)]
@@ -409,11 +414,14 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
   // General hotkeys
   set_key_expression(HK_OPEN, hotkey_string({"Ctrl", "O"}));
   set_key_expression(HK_PLAY_PAUSE, "F10");
+  // We need ignoreOnFocusChange() when calling HK_STOP, as it opens a message box
+  // from the render window, and if we pressed ESC again to close that window,
+  // then the emulator would re-open it.
 #ifdef _WIN32
-  set_key_expression(HK_STOP, "ESCAPE");
+  set_key_expression(HK_STOP, "ignoreOnFocusChange(ESCAPE)");
   set_key_expression(HK_FULLSCREEN, hotkey_string({"Alt", "RETURN"}));
 #else
-  set_key_expression(HK_STOP, "Escape");
+  set_key_expression(HK_STOP, "ignoreOnFocusChange(Escape)");
   set_key_expression(HK_FULLSCREEN, hotkey_string({"Alt", "Return"}));
 #endif
   set_key_expression(HK_STEP, "F11");

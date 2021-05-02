@@ -26,6 +26,10 @@
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/USB/Bluetooth/BTBase.h"
 #include "Core/IOS/USB/Bluetooth/BTReal.h"
+#include "Core/HW/Wiimote.h"
+#include "Core/HW/SI/SI_Device.h"
+#include "Core/HW/GCPad.h"
+#include "Core/HW/GCKeyboard.h"
 #include "Core/State.h"
 #include "Core/WiiUtils.h"
 
@@ -40,6 +44,7 @@
 #include "VideoCommon/VideoConfig.h"
 
 constexpr const char* DUBOIS_ALGORITHM_SHADER = "dubois";
+constexpr u32 UPDATE_FREQUENCY = 200;
 
 HotkeyScheduler::HotkeyScheduler() : m_stop_requested(false)
 {
@@ -141,14 +146,48 @@ void HotkeyScheduler::Run()
 
   while (!m_stop_requested.IsSet())
   {
-    Common::SleepCurrentThread(5);
+    // Not sure why we sleep before the first cycle and not after it
+    Common::SleepCurrentThread(1000 / UPDATE_FREQUENCY);
 
-    g_controller_interface.SetCurrentInputChannel(ciface::InputChannel::FreeLook);
-    g_controller_interface.UpdateInput();
+    g_controller_interface.UpdateInput(ciface::InputChannel::FreeLook, 1.0 / UPDATE_FREQUENCY);
     FreeLook::UpdateInput();
 
-    g_controller_interface.SetCurrentInputChannel(ciface::InputChannel::Host);
-    g_controller_interface.UpdateInput();
+    // We always pass in UPDATE_FREQUENCY as the input doesn't care about sleep ms variations
+    g_controller_interface.UpdateInput(ciface::InputChannel::Host, 1.0 / UPDATE_FREQUENCY);
+
+    // Cache input for emulation related controllers when emulation is not running (for UI).
+    // As an optimization we only process currently attached controllers, but we don't have to.
+    // While this doesn't seem thread safe, caching input already has its thread locking inside.
+    if (Core::GetState() == Core::State::Uninitialized)
+    {
+      // Wii Remotes aren't updated when emulating GC but they are also not accessible from the UI
+      // so we wouldn't need to cache them
+      InputConfig* config;
+      if (!SConfig::GetInstance().m_bt_passthrough_enabled)
+      {
+        config = Wiimote::GetConfig();
+        for (int i = 0; i < config->GetControllersNum(); ++i)
+        {
+          if (WiimoteCommon::GetSource(unsigned int(i)) == WiimoteSource::Emulated)
+            config->GetController(i)->CacheInput();
+        }
+      }
+      config = Pad::GetConfig();
+      for (int i = 0; i < config->GetControllersNum(); ++i)
+      {
+        if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[i]))
+          config->GetController(i)->CacheInput();
+      }
+      config = Keyboard::GetConfig();
+      for (int i = 0; i < config->GetControllersNum(); ++i)
+      {
+        if (SConfig::GetInstance().m_SIDevice[i] ==
+            SerialInterface::SIDevices::SIDEVICE_GC_KEYBOARD)
+        {
+          config->GetController(i)->CacheInput();
+        }
+      }
+    }
 
     if (!HotkeyManagerEmu::IsEnabled())
       continue;
@@ -156,12 +195,13 @@ void HotkeyScheduler::Run()
     if (Core::GetState() != Core::State::Stopping)
     {
       // Obey window focus (config permitting) before checking hotkeys.
-      Core::UpdateInputGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS));
+      ControlReference::UpdateGate(Config::Get(Config::MAIN_FOCUSED_HOTKEYS), false, true,
+                                   ciface::InputChannel::Host);
 
       HotkeyManagerEmu::GetStatus();
 
       // Everything else on the host thread (controller config dialog) should always get input.
-      ControlReference::SetInputGate(true);
+      ControlReference::SetCurrentGateOpen();
 
       if (!Core::IsRunningAndStarted())
         continue;
@@ -212,6 +252,10 @@ void HotkeyScheduler::Run()
       // Exit
       if (IsHotkey(HK_EXIT))
         emit ExitHotkey();
+
+      // Unlock Cursor
+      if (IsHotkey(HK_UNLOCK_CURSOR))
+        emit UnlockCursor();
 
       auto& settings = Settings::Instance();
 
@@ -576,6 +620,8 @@ void HotkeyScheduler::Run()
     if (IsHotkey(HK_SAVE_STATE_FILE))
       emit StateSaveFile();
   }
+
+  g_controller_interface.Reset(ciface::InputChannel::Host);
 }
 
 void HotkeyScheduler::CheckDebuggingHotkeys()

@@ -12,9 +12,10 @@
 
 #include "Common/Matrix.h"
 #include "Common/WindowSystemInfo.h"
+#include "InputCommon/ControllerInterface/InputChannel.h"
 #include "InputCommon/ControllerInterface/CoreDevice.h"
 
-// enable disable sources
+// enable/disable sources
 #ifdef _WIN32
 #define CIFACE_USE_WIN32
 #endif
@@ -31,23 +32,6 @@
 #define CIFACE_USE_PIPES
 #endif
 #define CIFACE_USE_DUALSHOCKUDPCLIENT
-
-namespace ciface
-{
-// A thread local "input channel" is maintained to handle the state of relative inputs.
-// This allows simultaneous use of relative inputs across different input contexts.
-// e.g. binding relative mouse movements to both GameCube controllers and FreeLook.
-// These operate at different rates and processing one would break the other without separate state.
-enum class InputChannel
-{
-  Host,
-  SerialInterface,
-  Bluetooth,
-  FreeLook,
-  Count,
-};
-
-}  // namespace ciface
 
 //
 // ControllerInterface
@@ -69,7 +53,8 @@ public:
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
   void PlatformPopulateDevices(std::function<void()> callback);
   bool IsInit() const { return m_is_init; }
-  void UpdateInput();
+  void UpdateInput(ciface::InputChannel input_channel, double delta_seconds);
+  void Reset(ciface::InputChannel input_channel);
 
   // Set adjustment from the full render window aspect-ratio to the drawn aspect-ratio.
   // Used to fit mouse cursor inputs to the relevant region of the render window.
@@ -83,49 +68,16 @@ public:
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
 
-  static void SetCurrentInputChannel(ciface::InputChannel);
   static ciface::InputChannel GetCurrentInputChannel();
+  static double GetCurrentInputDeltaSeconds();
 
 private:
   std::list<std::function<void()>> m_devices_changed_callbacks;
   mutable std::mutex m_callbacks_mutex;
   std::atomic<bool> m_is_init;
-  std::atomic<bool> m_is_populating_devices{false};
+  std::atomic<int> m_is_populating_devices;
   WindowSystemInfo m_wsi;
-  std::atomic<float> m_aspect_ratio_adjustment = 1;
+  std::atomic<float> m_aspect_ratio_adjustment = 1.f;
 };
-
-namespace ciface
-{
-template <typename T>
-class RelativeInputState
-{
-public:
-  void Update()
-  {
-    const auto channel = int(ControllerInterface::GetCurrentInputChannel());
-
-    m_value[channel] = m_delta[channel];
-    m_delta[channel] = {};
-  }
-
-  T GetValue() const
-  {
-    const auto channel = int(ControllerInterface::GetCurrentInputChannel());
-
-    return m_value[channel];
-  }
-
-  void Move(T delta)
-  {
-    for (auto& d : m_delta)
-      d += delta;
-  }
-
-private:
-  std::array<T, int(InputChannel::Count)> m_value;
-  std::array<T, int(InputChannel::Count)> m_delta;
-};
-}  // namespace ciface
 
 extern ControllerInterface g_controller_interface;

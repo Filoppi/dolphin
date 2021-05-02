@@ -72,7 +72,9 @@ static constexpr std::array<u32, 2> s_clock_freqs{{
 static u64 s_ticks_last_line_start;  // number of ticks when the current full scanline started
 static u32 s_half_line_count;        // number of halflines that have occurred for this full frame
 static u32 s_half_line_of_next_si_poll;  // halfline when next SI poll results should be available
-static constexpr u32 num_half_lines_for_si_poll = (7 * 2) + 1;  // this is how long an SI poll takes
+static u32 s_si_poll_half_line_count;  // number of halflines occurred between the last 2 SI updates
+static u32 s_prev_si_polls_ticks;
+static constexpr u32 num_half_lines_for_si_poll = (7 * 2) + 1;  // this is how long a SI poll takes
 
 // below indexes are 0-based
 static u32 s_even_field_first_hl;  // index first halfline of the even field
@@ -106,6 +108,8 @@ void DoState(PointerWrap& p)
   p.Do(m_BorderHBlank);
   p.Do(s_ticks_last_line_start);
   p.Do(s_half_line_count);
+  p.Do(s_si_poll_half_line_count);
+  p.Do(s_prev_si_polls_ticks);
   p.Do(s_half_line_of_next_si_poll);
 
   UpdateParameters();
@@ -189,6 +193,8 @@ void Preset(bool _bNTSC)
 
   s_ticks_last_line_start = 0;
   s_half_line_count = 0;
+  s_si_poll_half_line_count = 0;
+  s_prev_si_polls_ticks = 0; //To review this and all
   s_half_line_of_next_si_poll = num_half_lines_for_si_poll;  // first sampling starts at vsync
 
   UpdateParameters();
@@ -865,10 +871,16 @@ void Update(u64 ticks)
 
   // If an SI poll is scheduled to happen on this half-line, do it!
 
+  s_si_poll_half_line_count++;
   if (s_half_line_of_next_si_poll == s_half_line_count)
   {
-    Core::UpdateInputGate(!SConfig::GetInstance().m_BackgroundInput);
-    SerialInterface::UpdateDevices();
+    const double delta_time =
+        double(CoreTiming::GetTicks() - s_prev_si_polls_ticks) / SystemTimers::GetTicksPerSecond();
+    s_prev_si_polls_ticks = CoreTiming::GetTicks();
+    SerialInterface::UpdateDevices(delta_time);
+
+    s_si_poll_half_line_count = 0;
+
     s_half_line_of_next_si_poll += 2 * SerialInterface::GetPollXLines();
   }
 

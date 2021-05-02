@@ -95,6 +95,7 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
 
   if (indicator)
   {
+    indicator->SetMappingWindow(GetParent());
     const auto indicator_layout = new QBoxLayout(QBoxLayout::Direction::Down);
     indicator_layout->addWidget(indicator);
     indicator_layout->setAlignment(Qt::AlignCenter);
@@ -119,13 +120,14 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
 
   for (auto& control : group->controls)
   {
-    auto* button = new MappingButton(this, control->control_ref.get(), !indicator);
-
-    button->setMinimumWidth(100);
-    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     const bool translate = control->translate == ControllerEmu::Translate;
     const QString translated_name =
         translate ? tr(control->ui_name.c_str()) : QString::fromStdString(control->ui_name);
+
+    auto* button = new MappingButton(this, control->control_ref.get(), !indicator, translated_name);
+
+    button->setMinimumWidth(100);
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     form_layout->addRow(translated_name, button);
   }
 
@@ -139,19 +141,13 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
     case ControllerEmu::SettingType::Double:
       setting_widget = new MappingDouble(
           this, static_cast<ControllerEmu::NumericSetting<double>*>(setting.get()));
-      has_edit_condition =
-          static_cast<ControllerEmu::NumericSetting<double>*>(setting.get())->GetEditCondition() !=
-          nullptr;
+      has_edit_condition = setting.get()->HasEditCondition();
       break;
-
     case ControllerEmu::SettingType::Bool:
       setting_widget =
           new MappingBool(this, static_cast<ControllerEmu::NumericSetting<bool>*>(setting.get()));
-      has_edit_condition =
-          static_cast<ControllerEmu::NumericSetting<bool>*>(setting.get())->GetEditCondition() !=
-          nullptr;
+      has_edit_condition = setting.get()->HasEditCondition();
       break;
-
     default:
       // FYI: Widgets for additional types can be implemented as needed.
       break;
@@ -224,34 +220,22 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
 
 void MappingWidget::RefreshSettingsEnabled()
 {
+  if (m_block_update)
+    return;
+
   for (auto& numeric_settings : m_edit_condition_numeric_settings)
   {
-    bool enabled = true;
     const ControllerEmu::NumericSettingBase* setting = std::get<0>(numeric_settings);
-    switch (setting->GetType())
-    {
-    case ControllerEmu::SettingType::Double:
-      enabled = static_cast<const ControllerEmu::NumericSetting<double>*>(setting)->IsEnabled();
-      break;
-
-    case ControllerEmu::SettingType::Bool:
-      enabled = static_cast<const ControllerEmu::NumericSetting<bool>*>(setting)->IsEnabled();
-      break;
-    }
-    enabled = enabled && std::get<2>(numeric_settings)->enabled;
+    bool enabled = setting->IsEnabled() && std::get<2>(numeric_settings)->enabled;
 
     if (QWidget* widget = std::get<1>(numeric_settings).labelItem->widget())
-    {
       widget->setEnabled(enabled);
-    }
     if (QLayout* layout = std::get<1>(numeric_settings).fieldItem->layout())
     {
       for (int i = 0; i < layout->count(); ++i)
       {
         if (QWidget* widget = layout->itemAt(i)->widget())
-        {
           widget->setEnabled(enabled);
-        }
       }
     }
   }
@@ -270,16 +254,18 @@ MappingWidget::CreateSettingAdvancedMappingButton(ControllerEmu::NumericSettingB
   button->setToolTip(tr("Advanced mapping"));
 
   button->connect(button, &QPushButton::clicked, [this, &setting]() {
-    if (setting.IsSimpleValue())
-      setting.SetExpressionFromValue();
+    // Don't update values in the parent widget as we are customizing them. Can't use QSignalBlocker
+    m_block_update = true;
 
-    IOWindow io(this, GetController(), &setting.GetInputReference(), IOWindow::Type::InputSetting);
+    IOWindow io(this, GetController(), &setting.GetInputReference(), IOWindow::Type::InputSetting,
+                tr(setting.GetUIName()), &setting);
     io.exec();
-
-    setting.SimplifyIfPossible();
 
     ConfigChanged();
     SaveSettings();
+
+    m_block_update = false;
+    RefreshSettingsEnabled();
   });
 
   return button;

@@ -69,16 +69,18 @@ public:
 
   void SetControlExpression(int index, const std::string& expression);
 
-  void AddInput(Translatability translate, std::string name, ControlState range = 1.0);
+  void AddInput(Translatability translate, std::string name,
+                ControlState range = ControlReference::DEFAULT_RANGE);
   void AddInput(Translatability translate, std::string name, std::string ui_name,
-                ControlState range = 1.0);
-  void AddOutput(Translatability translate, std::string name, ControlState range = 1.0);
+                ControlState range = ControlReference::DEFAULT_RANGE);
+  void AddOutput(Translatability translate, std::string name,
+                 ControlState range = ControlReference::DEFAULT_RANGE);
 
   template <typename T>
   void AddSetting(SettingValue<T>* value, const NumericSettingDetails& details,
                   std::common_type_t<T> default_value_, std::common_type_t<T> min_value = {},
                   std::common_type_t<T> max_value = T(100),
-                  NumericSetting<bool>* edit_condition = nullptr)
+                  const NumericSetting<bool>* edit_condition = nullptr)
   {
     numeric_settings.emplace_back(std::make_unique<NumericSetting<T>>(
         value, details, default_value_, min_value, max_value, edit_condition));
@@ -101,7 +103,8 @@ public:
 
   bool enabled = true;
   std::vector<std::unique_ptr<Control>> controls;
-  // Settings can point to each other so never remove them individually
+  // Settings can point to each other so never remove them individually.
+  // There might be settings that are not in this list.
   std::vector<std::unique_ptr<NumericSettingBase>> numeric_settings;
 };
 }  // namespace ControllerEmu

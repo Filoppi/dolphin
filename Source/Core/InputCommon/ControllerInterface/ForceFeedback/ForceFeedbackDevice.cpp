@@ -235,7 +235,7 @@ ForceFeedbackDevice::Force::Force(ForceFeedbackDevice* parent, const char* name,
 {
 }
 
-void ForceFeedbackDevice::Force::SetState(ControlState state)
+void ForceFeedbackDevice::Force::SetStateInternal(ControlState state)
 {
   const auto new_val = int(DI_FFNOMINALMAX * state);
 

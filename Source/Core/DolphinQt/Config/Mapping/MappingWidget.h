@@ -10,6 +10,7 @@
 #include <QString>
 #include <QFormLayout>
 #include <QWidget>
+#include <QFormLayout>
 
 constexpr int WIDGET_MAX_WIDTH = 112;
 
@@ -28,10 +29,6 @@ class ControlGroup;
 class EmulatedController;
 class NumericSettingBase;
 }  // namespace ControllerEmu
-
-// For smoother UI, this should be based on the current monitor refresh rate.
-// No point in this being higher than HotkeyScheduler.cpp UPDATE_FREQUENCY
-constexpr int INDICATOR_UPDATE_FREQ = 60;
 
 class MappingWidget : public QWidget
 {
@@ -63,7 +60,9 @@ protected:
 private:
   MappingWindow* const m_parent;
 
+protected:
   std::vector<std::tuple<const ControllerEmu::NumericSettingBase*, QFormLayout::TakeRowResult,
                          const ControllerEmu::ControlGroup*>>
       m_edit_condition_numeric_settings;
+  bool m_block_update = false;
 };

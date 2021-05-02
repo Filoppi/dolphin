@@ -27,10 +27,12 @@ class QPlainTextEdit;
 class QPushButton;
 class QSlider;
 class QSpinBox;
+class QLabel;
 
 namespace ControllerEmu
 {
 class EmulatedController;
+class NumericSettingBase;
 }
 
 class InputStateLineEdit;
@@ -67,8 +69,9 @@ public:
     Output
   };
 
-  explicit IOWindow(MappingWidget* parent, ControllerEmu::EmulatedController* m_controller,
-                    ControlReference* ref, Type type);
+  explicit IOWindow(MappingWidget* parent, ControllerEmu::EmulatedController* controller,
+                    ControlReference* ref, Type type, const QString& name,
+                    ControllerEmu::NumericSettingBase* numeric_setting = nullptr);
 
   std::shared_ptr<ciface::Core::Device> GetSelectedDevice();
 
@@ -83,7 +86,8 @@ private:
   void OnDeviceChanged();
   void OnDetectButtonPressed();
   void OnTestButtonPressed();
-  void OnRangeChanged(int range);
+  void OnUIRangeChanged(int range);
+  void OnRangeChanged();
 
   void AppendSelectedOption();
   void UpdateOptionList();
@@ -97,6 +101,8 @@ private:
 
   void UpdateExpression(std::string new_expression, UpdateMode mode = UpdateMode::Normal);
   void SaveRange();
+
+  ControlState GetNumericSettingValue() const;
 
   // Main Layout
   QVBoxLayout* m_main_layout;
@@ -112,22 +118,23 @@ private:
   QSpinBox* m_range_spinbox;
 
   // Shared actions
+  QPushButton* m_help_button;
   QPushButton* m_select_button;
   QComboBox* m_operators_combo;
+  QComboBox* m_functions_combo;
 
   // Input actions
   QPushButton* m_detect_button;
-  QComboBox* m_functions_combo;
-  std::vector<QString> m_functions_parameters;
 
   // Output actions
   QPushButton* m_test_button;
 
-  // Textarea
+  // TextArea
   QPlainTextEdit* m_expression_text;
   InputStateLineEdit* m_parse_text;
+  QLabel* m_focus_label;
 
-  // Buttonbox
+  // ButtonBox
   QDialogButtonBox* m_button_box;
   QPushButton* m_clear_button;
 
@@ -138,5 +145,7 @@ private:
 
   ciface::Core::DeviceQualifier m_devq;
   Type m_type;
+  ControllerEmu::NumericSettingBase* m_numeric_setting;
   std::shared_ptr<ciface::Core::Device> m_selected_device;
+  std::vector<QString> m_functions_parameters;
 };

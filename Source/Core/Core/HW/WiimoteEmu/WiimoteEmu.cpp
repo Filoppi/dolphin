@@ -193,7 +193,7 @@ void Wiimote::Reset()
 
   m_imu_cursor_state = {};
 
-  m_ir->ResetState(true);
+  m_ir->ResetState();
 }
 
 Wiimote::Wiimote(const unsigned int index) : m_index(index)
@@ -426,7 +426,7 @@ void Wiimote::UpdateButtonsStatus()
 // This is called every ::Wiimote::UPDATE_FREQ (200hz)
 void Wiimote::Update()
 {
-  const auto lock = GetStateLock();
+  CacheInput();
 
   // Hotkey / settings modifier
   // Data is later accessed in IsSideways and IsUpright
@@ -599,7 +599,6 @@ void Wiimote::SendDataReport()
 bool Wiimote::IsButtonPressed()
 {
   u16 buttons = 0;
-  const auto lock = GetStateLock();
   m_buttons->GetState(&buttons, button_bitmasks);
   m_dpad->GetState(&buttons, dpad_bitmasks);
 
@@ -609,6 +608,8 @@ bool Wiimote::IsButtonPressed()
 void Wiimote::LoadDefaults(const ControllerInterface& ciface)
 {
   EmulatedController::LoadDefaults(ciface);
+
+  const auto lock = GetStateLock();
 
 // Buttons
 #if defined HAVE_X11 && HAVE_X11
@@ -717,7 +718,7 @@ bool Wiimote::IsUpright() const
 void Wiimote::SetRumble(bool on)
 {
   const auto lock = GetStateLock();
-  m_rumble->controls.front()->control_ref->State(on);
+  m_rumble->controls.front()->control_ref->SetState(on);
 }
 
 void Wiimote::StepDynamics()

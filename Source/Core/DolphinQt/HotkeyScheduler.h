@@ -12,6 +12,7 @@
 #include "Common/Flag.h"
 #include "InputCommon/InputProfile.h"
 
+// This isn't exclusively responsible for hotkeys, it's just an old name
 class HotkeyScheduler : public QObject
 {
   Q_OBJECT
@@ -27,6 +28,7 @@ signals:
   void ChangeDisc();
 
   void ExitHotkey();
+  void UnlockCursor();
   void ActivateChat();
   void RequestGolfControl();
   void FullScreenHotkey();

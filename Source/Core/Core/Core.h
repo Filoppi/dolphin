@@ -162,6 +162,4 @@ void HostDispatchJobs();
 
 void DoFrameStep();
 
-void UpdateInputGate(bool require_focus);
-
 }  // namespace Core

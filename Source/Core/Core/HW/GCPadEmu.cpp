@@ -93,10 +93,12 @@ GCPad::GCPad(const unsigned int index) : m_index(index)
 
   // options
   groups.emplace_back(m_options = new ControllerEmu::ControlGroup(_trans("Options")));
-  m_options->AddSetting(&m_always_connected_setting,
-                        // i18n: Treat a controller as always being connected regardless of what
-                        // devices the user actually has plugged in
-                        _trans("Always Connected"), false);
+  m_options->AddSetting(
+      &m_always_connected_setting,
+      {_trans("Always Connected"), _trans(""),
+       _trans("If this is false and you have a default device,\nit will link the emulated "
+              "controller connection state\nto the real device connection state.")},
+      false);
 }
 
 std::string GCPad::GetName() const
@@ -129,12 +131,13 @@ ControllerEmu::ControlGroup* GCPad::GetGroup(PadGroup group)
   }
 }
 
-GCPadStatus GCPad::GetInput() const
+GCPadStatus GCPad::GetInput()
 {
-  const auto lock = GetStateLock();
+  CacheInput();
+
   GCPadStatus pad = {};
 
-  if (!(m_always_connected_setting.GetValue() || IsDefaultDeviceConnected()))
+  if (!(m_always_connected_setting.GetValue() || IsDefaultDeviceConnected() || !HasDefaultDevice()))
   {
     pad.isConnected = false;
     return pad;
@@ -173,12 +176,14 @@ GCPadStatus GCPad::GetInput() const
 void GCPad::SetOutput(const ControlState strength)
 {
   const auto lock = GetStateLock();
-  m_rumble->controls[0]->control_ref->State(strength);
+  m_rumble->controls[0]->control_ref->SetState(strength);
 }
 
 void GCPad::LoadDefaults(const ControllerInterface& ciface)
 {
   EmulatedController::LoadDefaults(ciface);
+
+  const auto lock = GetStateLock();
 
   // Buttons
   m_buttons->SetControlExpression(0, "X");  // A
@@ -239,6 +244,5 @@ void GCPad::LoadDefaults(const ControllerInterface& ciface)
 
 bool GCPad::GetMicButton() const
 {
-  const auto lock = GetStateLock();
   return m_mic->controls.back()->GetState<bool>();
 }
