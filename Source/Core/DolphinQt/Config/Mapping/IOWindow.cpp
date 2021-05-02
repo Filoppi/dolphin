@@ -905,25 +905,26 @@ void IOWindow::UpdateDeviceList()
 {
   const QSignalBlocker blocker(m_devices_combo);
 
-  const auto previous_name = m_devices_combo->currentData().toString().toStdString();
+  const auto previous_device_name = m_devices_combo->currentData().toString().toStdString();
 
   m_devices_combo->clear();
 
-  // Try to keep the previous selected device, otherwise fallback to default,
-  // or to the first device if there is no default.
-  const auto default_name = m_controller->GetDefaultDevice().ToString();
-  int previous_device_index = -1;
+  // Default to the default device or to the first device if there isn't a default.
+  // Try to the keep the previous selected device, mark it as disconnected if it's gone, as it could
+  // reconnect soon after if this is a devices refresh and it would be annoying to lose the value.
+  const auto default_device_name = m_controller->GetDefaultDevice().ToString();
   int default_device_index = -1;
+  int previous_device_index = -1;
   for (const auto& name : g_controller_interface.GetAllDeviceStrings())
   {
     QString qname = QString();
-    if (name == default_name)
+    if (name == default_device_name)
     {
       default_device_index = m_devices_combo->count();
       // Specify "default" even if we only have one device
-      qname.append(QStringLiteral("[default] "));
+      qname.append(QLatin1Char{'['} + tr("default") + QStringLiteral("] "));
     }
-    if (name == previous_name)
+    if (name == previous_device_name)
     {
       previous_device_index = m_devices_combo->count();
     }
@@ -935,11 +936,28 @@ void IOWindow::UpdateDeviceList()
   {
     m_devices_combo->setCurrentIndex(previous_device_index);
   }
+  else if (!previous_device_name.empty())
+  {
+    const QString qname = QString::fromStdString(previous_device_name);
+    QString adjusted_qname;
+    if (previous_device_name == default_device_name)
+    {
+      adjusted_qname.append(QLatin1Char{'['} + tr("default") + QStringLiteral("] "));
+    }
+    adjusted_qname.append(QLatin1Char{'['} + tr("disconnected") + QStringLiteral("] "))
+        .append(qname);
+    m_devices_combo->addItem(adjusted_qname, qname);
+    m_devices_combo->setCurrentIndex(m_devices_combo->count() - 1);
+  }
   else if (default_device_index >= 0)
   {
     m_devices_combo->setCurrentIndex(default_device_index);
   }
-  // The device pointer might have changed so we need to force refresh it
+  else if (m_devices_combo->count() > 0)
+  {
+    m_devices_combo->setCurrentIndex(0);
+  }
+  // The device object might have changed so we need to always refresh it
   OnDeviceChanged();
 }
 
