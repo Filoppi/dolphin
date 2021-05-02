@@ -155,7 +155,12 @@ void Device::Output::SetState(ControlState state, const void* source_object)
                       [](const ControlState value, const std::pair<const void*, ControlState>& p) {
                         return value + p.second;
                       });
-  if (m_final_state != final_state)
+  const bool state_changed = m_final_state != final_state;
+  // Some devices will automatically reset outputs states if the value isn't re-appleid once in a while,
+  // so always update the state. Now, theoretically, it would be better to do this based on the device,
+  // and to check if the state changed internally, as it could be casted to any type, but given how
+  // rare this case is, we can just use this global "fix".
+  if (state_changed || (final_state != 0))
   {
     m_final_state = final_state;
     SetStateInternal(m_final_state);
@@ -390,7 +395,7 @@ auto DeviceContainer::DetectInput(const std::vector<std::string>& device_strings
       last_state = new_state;
     }
 
-    bool IsPressed()
+    bool IsPressed() const
     {
       if (!is_ready)
         return false;

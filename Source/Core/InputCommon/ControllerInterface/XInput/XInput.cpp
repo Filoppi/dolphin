@@ -99,12 +99,10 @@ public:
 private:
   void SetStateInternal(ControlState state) override
   {
-    const auto old_value = m_motor;
     m_motor = WORD(std::clamp(state, 0.0, 1.0) * m_range);
-
-    // Only update if the state changed.
-    if (m_motor != old_value)
-      m_parent->UpdateMotors();
+    // We don't want to avoid setting this even if the values hasn't changed as
+    // XInput devices stop rumbling after a bit if we don't keep setting the same value
+    m_parent->UpdateMotors();
   }
 
   WORD& m_motor;

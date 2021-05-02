@@ -707,11 +707,9 @@ std::string evdevDevice::RumbleEffect::GetName() const
 
 void evdevDevice::Effect::SetStateInternal(ControlState state)
 {
-  if (UpdateParameters(state))
-  {
-    // Update effect if parameters changed.
-    UpdateEffect();
-  }
+  UpdateParameters(state);
+  // Keep setting it even if the value hasn't changed to prevent it from stopping
+  UpdateEffect();
 }
 
 void evdevDevice::Effect::UpdateEffect()
