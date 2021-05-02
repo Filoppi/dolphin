@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <type_traits>
@@ -29,6 +30,7 @@ struct GUIDComparator
 };
 
 static std::set<GUID, GUIDComparator> s_guids_in_use;
+static std::mutex s_guids_mutex;
 
 void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
 {
@@ -46,9 +48,12 @@ void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
     }
 
     // Skip devices we are already using.
-    if (s_guids_in_use.count(joystick.guidInstance))
     {
-      continue;
+      std::lock_guard<std::mutex> lk(s_guids_mutex);
+      if (s_guids_in_use.count(joystick.guidInstance))
+      {
+        continue;
+      }
     }
 
     LPDIRECTINPUTDEVICE8 js_device;
@@ -79,8 +84,11 @@ void InitJoystick(IDirectInput8* const idi8, HWND hwnd)
         // could now have some outputs if it didn't before.
         if (js->Inputs().size() || js->Outputs().size())
         {
-          s_guids_in_use.insert(joystick.guidInstance);
-          g_controller_interface.AddDevice(std::move(js));
+          if (g_controller_interface.AddDevice(std::move(js)))
+          {
+            std::lock_guard<std::mutex> lk(s_guids_mutex);
+            s_guids_in_use.insert(joystick.guidInstance);
+          }
         }
       }
       else
@@ -184,6 +192,7 @@ Joystick::~Joystick()
   info.dwSize = sizeof(info);
   if (SUCCEEDED(m_device->GetDeviceInfo(&info)))
   {
+    std::lock_guard<std::mutex> lk(s_guids_mutex);
     s_guids_in_use.erase(info.guidInstance);
   }
   else
