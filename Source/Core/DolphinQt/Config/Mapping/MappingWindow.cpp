@@ -353,7 +353,7 @@ bool MappingWindow::IsDetectingAllDevices() const
 
 void MappingWindow::RefreshDevices()
 {
-  Core::RunAsCPUThread([&] { g_controller_interface.RefreshDevices(); });
+  g_controller_interface.RefreshDevices();
 }
 
 void MappingWindow::OnGlobalDevicesChanged()
@@ -406,6 +406,7 @@ void MappingWindow::OnGlobalDevicesChanged()
 
   // Default to "None" if we had no default device or no devices.
   // Defaulting to the first found device is not necessary because configs already default to it.
+  // Updating references isn't always necessary as it's already called elsewhere on device change.
   if ((default_device.empty() || !has_any_devices) && !created_disconnected_default_device)
   {
     m_devices_combo->setCurrentIndex(m_devices_combo->count() - 1);

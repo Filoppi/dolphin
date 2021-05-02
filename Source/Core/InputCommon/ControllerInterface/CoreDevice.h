@@ -356,7 +356,6 @@ public:
   std::string GetDefaultDeviceString() const;
   std::shared_ptr<Device> FindDevice(const DeviceQualifier& devq) const;
 
-  std::unique_lock<std::recursive_mutex> GetDevicesLock() const;
   std::unique_lock<std::mutex> GetDevicesOutputLock() const;
 
   bool HasConnectedDevice(const DeviceQualifier& qualifier) const;

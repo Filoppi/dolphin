@@ -15,7 +15,6 @@
 
 #include "Common/Config/Config.h"
 #include "Common/FileUtil.h"
-#include "Common/StringUtil.h"
 
 #include "Core/Config/MainSettings.h"
 #include "Core/ConfigManager.h"
@@ -24,10 +23,10 @@
 #include "Core/NetPlayClient.h"
 #include "Core/NetPlayServer.h"
 
+#include "DolphinQt/Host.h"
 #include "DolphinQt/QtUtils/QueueOnObject.h"
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
-#include "InputCommon/InputConfig.h"
 
 #include "VideoCommon/NetPlayChatUI.h"
 #include "VideoCommon/NetPlayGolfUI.h"
@@ -43,8 +42,24 @@ Settings::Settings()
   Config::AddConfigChangedCallback(
       [this] { QueueOnObject(this, [this] { emit ConfigChanged(); }); });
 
-  g_controller_interface.RegisterDevicesChangedCallback(
-      [this] { QueueOnObject(this, [this] { emit DevicesChanged(); }); });
+  g_controller_interface.RegisterDevicesChangedCallback([this] {
+    if (Host::GetInstance()->IsHostThread())
+    {
+      emit DevicesChanged();
+    }
+    else
+    {
+      // Any device shared_ptr in the host thread needs to be released immediately as otherwise
+      // they'd continue living until the queued event has run, but some devices can't be recreated
+      // until they are destroyed.
+      // This is safe from any thread. Devices will be refreshed and re-acquired and in DevicesChanged().
+      // Waiting on QueueOnObject() to have finished running was not feasible as it would cause
+      // deadlocks without heavy workarounds.
+      emit ReleaseDevices();
+
+      QueueOnObject(this, [this] { emit DevicesChanged(); });
+    }
+  });
 
   SetCurrentUserStyle(GetCurrentUserStyle());
 }

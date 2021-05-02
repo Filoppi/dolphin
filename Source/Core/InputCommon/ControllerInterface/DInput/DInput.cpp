@@ -76,10 +76,13 @@ void ChangeWindow(HWND hwnd)
 {
   if (s_idi8)  // Has init? Ignore if called before the first PopulateDevices()
   {
-    // The KeyboardMouse device is marked as virtual device, so we avoid removing it
-    g_controller_interface.RemoveDevice([](const auto* dev) {
-      return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsVirtualDevice();
-    });
+    // The KeyboardMouse device is marked as virtual device, so we avoid removing it.
+    // We need to force all the DInput joysticks to be destroyed now, or recreation would fail.
+    g_controller_interface.RemoveDevice(
+        [](const auto* dev) {
+          return dev->GetSource() == DINPUT_SOURCE_NAME && !dev->IsVirtualDevice();
+        },
+        true);
 
     SetKeyboardMouseWindow(hwnd);
     InitJoystick(s_idi8, hwnd);

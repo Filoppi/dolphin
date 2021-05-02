@@ -300,6 +300,8 @@ public:
   void UpdateReferences(ControlEnvironment& env, bool is_input) override
   {
     Device::Output* previous_output = m_output;
+    // Keep the previous device alive to reset its output at the end
+    std::shared_ptr<Device> previous_device = m_device;
     m_output = nullptr;
     m_input = nullptr;
 
@@ -312,14 +314,16 @@ public:
       // or inputs being read by output expression. This is because we want to avoid acquiring
       // ControllerEmu::EmulatedController::GetDevicesInputLock() when setting values in output
       // expression or g_controller_interface.GetDevicesOutputLock() when getting values in input
-      // expressions. And doing such things is just unnecessary and hacky anyway.
+      // expressions. You can also use variables for input/output intercommunication.
       if (is_input)
         m_input = m_device->FindInput(m_qualifier.control_name);
       else
         m_output = m_device->FindOutput(m_qualifier.control_name);
+      // Drop the shared_ptr to the device if it's not actually used
+      if (!m_input && !m_output)
+        m_device = nullptr;
     }
 
-    // Reset the old output.
     if (m_output != previous_output && previous_output)
     {
       const auto lock = g_controller_interface.GetDevicesOutputLock();
@@ -640,7 +644,7 @@ private:
 // right-hand child. Its intended use is for supporting old-style barewords expressions.
 // Note that if you have a keyboard device as default device and the expression is a single digit
 // number, this will usually resolve in a numerical key instead of a numerical value.
-// Though if this expression belongs to NumeriSetting, it will likely be simplifed back to a value.
+// Though if this expression belongs to NumericSetting, it will likely be simplifed back to a value.
 class CoalesceExpression : public Expression
 {
 public:
@@ -1020,6 +1024,7 @@ static std::unique_ptr<Expression> ParseBarewordExpression(const std::string& st
   qualifier.control_name = str;
   qualifier.has_device = false;
 
+  // This will only work with the default device
   return std::make_unique<ControlExpression>(qualifier);
 }
 

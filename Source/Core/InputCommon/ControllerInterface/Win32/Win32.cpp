@@ -33,6 +33,8 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARA
     if (s_first_pupulate_devices_asked)
     {
       s_received_device_change_event.Set();
+      // TODO: we could easily use the message passed alongside this event, which tells
+      // whether a device was added or revoved, to avoid removing old, still connected, devices
       g_controller_interface.PlatformPopulateDevices([] {
         ciface::DInput::PopulateDevices(s_hwnd);
         ciface::XInput::PopulateDevices();
@@ -134,13 +136,10 @@ void ciface::Win32::PopulateDevices(void* hwnd)
     s_received_device_change_event.Reset();
     // Do this forced devices refresh in the messaging thread so it won't cause any race conditions
     PostMessage(s_message_window, WM_INPUT_DEVICE_CHANGE, 0, 0);
-    // It's not really the best idea to hang the main thread just to print a log,
-    // we should check later if we have actually received the call.
-    // Note that we might still receive the event after this log has printed.
-    // Note that this could possibly hang the main thread if the messaging thread was already
-    // waiting on the devices mutex.
-    if (!s_received_device_change_event.WaitFor(std::chrono::seconds(3)))
-      ERROR_LOG_FMT(CONTROLLERINTERFACE, "win32 timed out when trying to populate devices");
+    std::thread([] {
+      if (!s_received_device_change_event.WaitFor(std::chrono::microseconds(10)))
+        ERROR_LOG_FMT(CONTROLLERINTERFACE, "win32 timed out when trying to populate devices");
+    }).detach();
   }
   else
   {

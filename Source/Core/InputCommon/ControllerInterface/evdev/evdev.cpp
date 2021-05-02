@@ -197,6 +197,7 @@ public:
 
 static std::thread s_hotplug_thread;
 static Common::Flag s_hotplug_thread_running;
+static Common::Flag s_populate_devices;
 static int s_wakeup_eventfd;
 
 // There is no easy way to get the device name from only a dev node
@@ -258,11 +259,17 @@ static void AddDeviceNode(const char* devnode)
 
     evdev_device->AddNode(devnode, fd, dev);
 
+    s_devnode_objects.emplace(devnode, std::move(evdev_device));
+
     // Remove and re-add device as naming and inputs may have changed.
     // This will also give it the correct index and invoke device change callbacks.
-    g_controller_interface.RemoveDevice([&evdev_device](const auto* device) {
-      return static_cast<const evdevDevice*>(device) == evdev_device.get();
-    });
+    // Make sure to force the device removal immediately (as they are shared ptrs and
+    // they could be kept alive, preventing us from re-creating the device)
+    g_controller_interface.RemoveDevice(
+        [&evdev_device](const auto* device) {
+          return static_cast<const evdevDevice*>(device) == evdev_device.get();
+        },
+        true);
 
     g_controller_interface.AddDevice(evdev_device);
   }
@@ -272,17 +279,21 @@ static void AddDeviceNode(const char* devnode)
 
     const bool was_interesting = evdev_device->AddNode(devnode, fd, dev);
 
+    s_devnode_objects.emplace(devnode, std::move(evdev_device));
+
     if (was_interesting)
       g_controller_interface.AddDevice(evdev_device);
   }
-
-  s_devnode_objects.emplace(devnode, std::move(evdev_device));
 }
 
 static void HotplugThreadFunc()
 {
   Common::SetCurrentThreadName("evdev Hotplug Thread");
   NOTICE_LOG_FMT(CONTROLLERINTERFACE, "evdev hotplug thread started");
+
+  // We use udev to iterate over all /dev/input/event* devices.
+  // Note: the Linux kernel is currently limited to just 32 event devices. If
+  // this ever changes, hopefully udev will take care of this.
 
   udev* const udev = udev_new();
   Common::ScopeGuard udev_guard([udev] { udev_unref(udev); });
@@ -299,6 +310,32 @@ static void HotplugThreadFunc()
 
   while (s_hotplug_thread_running.IsSet())
   {
+    if (s_populate_devices.TestAndClear())
+    {
+      g_controller_interface.PlatformPopulateDevices([&udev] {
+        // List all input devices
+        udev_enumerate* const enumerate = udev_enumerate_new(udev);
+        udev_enumerate_add_match_subsystem(enumerate, "input");
+        udev_enumerate_scan_devices(enumerate);
+        udev_list_entry* const devices = udev_enumerate_get_list_entry(enumerate);
+
+        // Iterate over all input devices
+        udev_list_entry* dev_list_entry;
+        udev_list_entry_foreach(dev_list_entry, devices)
+        {
+          const char* path = udev_list_entry_get_name(dev_list_entry);
+
+          udev_device* dev = udev_device_new_from_syspath(udev, path);
+
+          if (const char* devnode = udev_device_get_devnode(dev))
+            AddDeviceNode(devnode);
+
+          udev_device_unref(dev);
+        }
+        udev_enumerate_unref(enumerate);
+      });
+    }
+
     fd_set fds;
 
     FD_ZERO(&fds);
@@ -378,34 +415,7 @@ void Init()
 
 void PopulateDevices()
 {
-  // We use udev to iterate over all /dev/input/event* devices.
-  // Note: the Linux kernel is currently limited to just 32 event devices. If
-  // this ever changes, hopefully udev will take care of this.
-
-  udev* const udev = udev_new();
-  ASSERT_MSG(PAD, udev != nullptr, "Couldn't initialize libudev.");
-
-  // List all input devices
-  udev_enumerate* const enumerate = udev_enumerate_new(udev);
-  udev_enumerate_add_match_subsystem(enumerate, "input");
-  udev_enumerate_scan_devices(enumerate);
-  udev_list_entry* const devices = udev_enumerate_get_list_entry(enumerate);
-
-  // Iterate over all input devices
-  udev_list_entry* dev_list_entry;
-  udev_list_entry_foreach(dev_list_entry, devices)
-  {
-    const char* path = udev_list_entry_get_name(dev_list_entry);
-
-    udev_device* dev = udev_device_new_from_syspath(udev, path);
-
-    if (const char* devnode = udev_device_get_devnode(dev))
-      AddDeviceNode(devnode);
-
-    udev_device_unref(dev);
-  }
-  udev_enumerate_unref(enumerate);
-  udev_unref(udev);
+  s_populate_devices.Set();
 }
 
 void Shutdown()

@@ -491,6 +491,7 @@ void IOWindow::CreateMainLayout()
     m_option_list->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
 
     m_option_list->setItemDelegate(new InputStateDelegate(this, 1, [&](int row) {
+      std::lock_guard lock(m_selected_device_mutex);
       // Clamp off negative values but allow greater than one in the text display.
       return std::max(GetSelectedDevice()->Inputs()[row]->GetState(), 0.0);
     }));
@@ -692,6 +693,7 @@ void IOWindow::ConnectWidgets()
     QToolTip::showText(QCursor::pos(), help_tooltip);
   });
 
+  connect(&Settings::Instance(), &Settings::ReleaseDevices, this, &IOWindow::ReleaseDevices);
   connect(&Settings::Instance(), &Settings::DevicesChanged, this, &IOWindow::UpdateDeviceList);
 
   connect(m_detect_button, &QPushButton::clicked, this, &IOWindow::OnDetectButtonPressed);
@@ -823,6 +825,7 @@ void IOWindow::OnDetectButtonPressed()
 
 void IOWindow::OnTestSelectedButtonPressed()
 {
+  std::lock_guard lock(m_selected_device_mutex);
   if (m_option_list->currentRow() < 0 || GetSelectedDevice() == nullptr)
     return;
 
@@ -859,13 +862,16 @@ void IOWindow::OnRangeChanged()
   m_range_slider->setValue(qt_value);
 }
 
+void IOWindow::ReleaseDevices()
+{
+  std::lock_guard lock(m_selected_device_mutex);
+  m_selected_device = nullptr;
+}
+
 void IOWindow::UpdateOptionList()
 {
-  {
-    // This might end up destroying an old device, and devices destruction needs the devices lock
-    const auto lock = g_controller_interface.GetDevicesLock();
-    m_selected_device = g_controller_interface.FindDevice(m_devq);
-  }
+  std::lock_guard lock(m_selected_device_mutex);
+  m_selected_device = g_controller_interface.FindDevice(m_devq);
   m_option_list->setRowCount(0);
 
   if (m_selected_device == nullptr)

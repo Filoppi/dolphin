@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <mutex>
 
 #include <QComboBox>
 #include <QDialog>
@@ -93,6 +94,7 @@ private:
   void AppendSelectedOption();
   void UpdateOptionList();
   void UpdateDeviceList();
+  void ReleaseDevices();
 
   enum class UpdateMode
   {
@@ -149,5 +151,6 @@ private:
   Type m_type;
   ControllerEmu::NumericSettingBase* m_numeric_setting;
   std::shared_ptr<ciface::Core::Device> m_selected_device;
+  std::mutex m_selected_device_mutex;
   std::vector<QString> m_functions_parameters;
 };

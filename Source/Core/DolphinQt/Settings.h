@@ -188,6 +188,7 @@ signals:
   void AutoUpdateTrackChanged(const QString& mode);
   void FallbackRegionChanged(const DiscIO::Region& region);
   void AnalyticsToggled(bool enabled);
+  void ReleaseDevices();
   void DevicesChanged();
   void SDCardInsertionChanged(bool inserted);
   void USBKeyboardConnectionChanged(bool connected);
