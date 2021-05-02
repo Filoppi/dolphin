@@ -201,15 +201,7 @@ void FreeLookController::Update()
 
   CacheInputAndRefreshOutput();
 
-  float dt = 1.0;
-  if (m_last_free_look_rotate_time)
-  {
-    using seconds = std::chrono::duration<float, std::ratio<1>>;
-    dt = std::chrono::duration_cast<seconds>(std::chrono::steady_clock::now() -
-                                             *m_last_free_look_rotate_time)
-             .count();
-  }
-  m_last_free_look_rotate_time = std::chrono::steady_clock::now();
+  float dt = static_cast<float>(ControllerInterface::GetCurrentRealInputDeltaSeconds());
 
   const auto gyro_motion_rad_velocity =
       m_rotation_gyro->GetState() ? *m_rotation_gyro->GetState() : Common::Vec3{};
@@ -254,10 +246,10 @@ void FreeLookController::Update()
     g_freelook_camera.IncreaseFovY(-1.0f * g_freelook_camera.GetFovStepSize() * dt);
 
   if (m_speed_buttons->controls[SpeedButtons::Decrease]->GetState<bool>())
-    g_freelook_camera.ModifySpeed(g_freelook_camera.GetSpeed() * -0.9 * dt);
+    g_freelook_camera.ModifySpeed(g_freelook_camera.GetSpeed() * -0.9f * dt);
 
   if (m_speed_buttons->controls[SpeedButtons::Increase]->GetState<bool>())
-    g_freelook_camera.ModifySpeed(g_freelook_camera.GetSpeed() * 1.1 * dt);
+    g_freelook_camera.ModifySpeed(g_freelook_camera.GetSpeed() * 1.1f * dt);
 
   if (m_speed_buttons->controls[SpeedButtons::Reset]->GetState<bool>())
     g_freelook_camera.ResetSpeed();
