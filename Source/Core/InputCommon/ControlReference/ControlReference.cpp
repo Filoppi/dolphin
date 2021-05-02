@@ -74,14 +74,8 @@ void ControlReference::UpdateReference(ciface::ExpressionParser::ControlEnvironm
 
   UpdateFocusFlags();
   UpdateBoundCount();
-  // Don't update the state on inputs, let it to it's next natural cycle,
-  // as this can be called by any thread at any time.
-  // If we are an output, immediately re-apply the last cached value with the new references
-  // (filtering won't be updated but it doesn't matter).
-  if (!IsInput())
-  {
-    UpdateState();
-  }
+  // Don't update the state on controls, let them update in their next natural cycle, as this can be
+  // called by any thread at any time, and it would also break control functions timings.
 }
 
 void ControlReference::UpdateFocusFlags()
@@ -132,7 +126,8 @@ std::optional<std::string> ControlReference::SetExpression(std::string expr)
 {
   ControllerEmu::EmulatedController::EnsureStateLock();
   // Don't do anything if it hasn't changed. This happens often as we reload configs every time we
-  // open input panels. We parse it again because we need to return the results, which we don't have
+  // open input panels. We parse it again because we need to return the result, which we don't have,
+  // but it's guaranteed to be the same as before.
   if (m_expression == expr)
     return ParseExpression(m_expression).description;
   // If there are any spaces or line breaks, we keep them as they can be used for clarity
@@ -141,7 +136,7 @@ std::optional<std::string> ControlReference::SetExpression(std::string expr)
   m_parse_status = parse_result.status;
   m_parsed_expression = std::move(parse_result.expr);
 
-  // Update input cached values immediately and re-apply outputs.
+  // Update input cached values immediately and try to re-apply outputs.
   // References are missing for now so this is partially useless but also necessary
   // for numeric settings simplifications in the UI.
   // The state of inputs is atomic so it's fine, though some places in the code that read
@@ -351,18 +346,12 @@ void InputReference::UpdateState()
 
 void OutputReference::SetState(ControlState state)
 {
-  // If "filtered", update it to 0 (the resting value), we wouldn't want the old state to persist.
-  // There isn't an event when the filter result would change so it will only start taking effect
-  // on the following set.
   if (!Filter())
     state = 0.0;
 
   // Useful for keeping the state after we change the expression and also to allow UI and game
   // to have different values
   m_cached_states[u8(g_controller_interface.GetCurrentInputChannel())] = state;
-
-  // It's important to call this even if the cached states are the same as before
-  UpdateState();
 }
 
 void OutputReference::UpdateState()

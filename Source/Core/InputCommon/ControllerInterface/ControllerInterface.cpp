@@ -46,7 +46,6 @@ using Clock = std::chrono::steady_clock;
 // threads as hotkeys are updated from a worker thread, but UI can read from the main thread. This
 // will never interfere with game threads.
 static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
-static s32 s_input_channels_just_started[u8(ciface::InputChannel::Max)];
 static double s_input_channels_delta_seconds[u8(ciface::InputChannel::Max)];
 static double s_input_channels_target_delta_seconds[u8(ciface::InputChannel::Max)];
 static s32 s_input_channels_updates_per_target[u8(ciface::InputChannel::Max)];
@@ -415,27 +414,24 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
   // Inputs for this channel will be read immediately after this call.
   // Make sure to not read them after the input channel has changed again (on the same thread).
   tls_input_channel = input_channel;
+  u8 i = u8(tls_input_channel);
   // This is not the actual world elapsed time, it's the emulation elapsed time
-  s_input_channels_delta_seconds[u8(tls_input_channel)] = delta_seconds;
+  s_input_channels_delta_seconds[i] = delta_seconds;
   // Delta seconds can be bigger or smaller than the target one, but they should average out
-  s_input_channels_target_delta_seconds[u8(tls_input_channel)] =
+  s_input_channels_target_delta_seconds[i] =
       target_delta_seconds > 0.f ? target_delta_seconds : delta_seconds;
-  s_input_channels_updates_per_target[u8(tls_input_channel)] = updates_per_target;
-  // After starting or resuming an input channel, this method will be called again before
-  // we get the change to restore outputs, so we need it to have a value of 2.
-  if (s_input_channels_just_started[u8(tls_input_channel)] > 0)
-    s_input_channels_just_started[u8(tls_input_channel)]--;
+  s_input_channels_updates_per_target[i] = updates_per_target;
 
   // Calculate the real/world elapsed time.
   // Useful to turn relative axes into "rate of change"/speed values usable by games
   const auto now = Clock::now();
-  Clock::time_point& input_channel_last_update =
-      s_input_channels_last_update[u8(tls_input_channel)];
-  s_input_channels_real_delta_seconds[u8(tls_input_channel)] =
+  Clock::time_point& input_channel_last_update = s_input_channels_last_update[i];
+  s_input_channels_real_delta_seconds[i] =
       std::chrono::duration_cast<std::chrono::duration<double>>(now - input_channel_last_update)
           .count();
   input_channel_last_update = now;
 
+  // TODO: if we are an emulation input channel, we should probably always lock
   // Prefer outdated values over blocking UI or CPU thread (avoids short but noticeable frame drop)
   if (m_devices_mutex.try_lock())
   {
@@ -444,9 +440,18 @@ void ControllerInterface::UpdateInput(ciface::InputChannel input_channel, double
     // Device::UpdateInput() would modify values read by ControlReference(s)
     const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
 
-    for (auto& d : m_devices)
+    for (const auto& d : m_devices)
+    {
+      // Theoretically we could avoid updating input on devices that don't have any references to
+      // them, but in practice a few devices types could break in different ways, so we don't
       d->UpdateInput();
+    }
   }
+}
+
+void ControllerInterface::SetInputChannel(ciface::InputChannel input_channel)
+{
+  tls_input_channel = input_channel;
 }
 
 // Call this when you are toggling pause or "closing" (stopping to update) an input channel.
@@ -465,18 +470,15 @@ void ControllerInterface::SetChannelRunning(ciface::InputChannel input_channel, 
   {
     // No need to clean s_input_channels_delta_seconds and the others
     s_input_channels_last_update[u8(tls_input_channel)] = Clock::now();
-    s_input_channels_just_started[u8(tls_input_channel)] = 2;
 
     const auto lock = ControllerEmu::EmulatedController::GetDevicesInputLock();
 
-    for (auto& d : m_devices)
+    for (const auto& d : m_devices)
       d->ResetInput();
   }
   else
   {
-    s_input_channels_just_started[u8(tls_input_channel)] = 0;
-
-    for (auto& d : m_devices)
+    for (const auto& d : m_devices)
     {
       // This isn't 100% right as other input channels could still be changing the outputs but
       // as of now that could never happen and even so, it's still better than stuck output values
@@ -534,11 +536,6 @@ void ControllerInterface::InvokeDevicesChangedCallbacks() const
 ciface::InputChannel ControllerInterface::GetCurrentInputChannel()
 {
   return tls_input_channel;
-}
-
-bool ControllerInterface::HasInputChannelJustStarted()
-{
-  return s_input_channels_just_started[u8(tls_input_channel)] > 0;
 }
 
 double ControllerInterface::GetCurrentInputDeltaSeconds()

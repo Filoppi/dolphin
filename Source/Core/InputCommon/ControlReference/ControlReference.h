@@ -22,7 +22,7 @@ using namespace ciface::Core;
 // each one can link to multiple devices and controls
 // when you change a ControlReference's expression,
 // you must use UpdateReference on it to rebind controls.
-// Requires EmulatedController::GetStateLock() on: SetState(), UpdateState(),
+// Requires EmulatedController::GetStateLock() on: SetState() (inputs only), UpdateState(),
 // UpdateReference(), SetExpression(), HasExpression() and GetExpression()
 //
 class ControlReference

@@ -9,8 +9,6 @@
 
 #include <QComboBox>
 #include <QDialogButtonBox>
-#include <QGroupBox>
-#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QItemDelegate>
 #include <QLabel>
@@ -27,7 +25,6 @@
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 
-#include "DolphinQt/Config/Graphics/BalloonTip.h"
 #include "DolphinQt/Config/Mapping/MappingCommon.h"
 #include "DolphinQt/Config/Mapping/MappingIndicator.h"
 #include "DolphinQt/Config/Mapping/MappingWidget.h"
@@ -301,7 +298,6 @@ void IOWindow::CreateMainLayout()
 
   m_detect_button->setToolTip(
       tr("Detect input from the current device.\nNote that some inputs can't be detected."));
-
   m_focus_label->setToolTip(
       tr("Window Focus.\nThese requirements could be ignored depending on your settings"));
 
@@ -370,84 +366,82 @@ void IOWindow::CreateMainLayout()
          "default to that value if you don't specify it.\n\"...\" means unlimited args are "
          "supported.\n\nWhen functions ask for a number of frames, they are usually input update "
          "frames,\nwhich differ from video frames (the video refresh rate, not the game "
-         "FPS).\nDon't try to mix input and output functions and expect them work.\nTheir state is "
+         "FPS).\nWhen functions ask for a time, it's usually used as game time, not real world "
+         "time.\nDon't try to mix input and output functions and expect them work.\nTheir state is "
          "updated even when emulation is not running and will carry over"));
   // This might cause an empty unselectable whitespace at the end of the ComboBox selection.
   // Given that a separator is also an item, we add an empty "func param" to keep indexes aligned.
   m_functions_combo->insertSeparator(m_functions_combo->count());
-  //To change all single QStringLiteral to QLatin1Char
   m_functions_parameters.push_back(QStringLiteral(""));
-  if (m_type != Type::Output)
+  // Logic/Math:
+  AddFunction("if");
+  AddFunction("not");
+  AddFunction("min");
+  AddFunction("max");
+  AddFunction("clamp");
+  AddFunction("minus");
+  AddFunction("pow");
+  AddFunction("sqrt");
+  AddFunction("sin");
+  AddFunction("cos");
+  AddFunction("tan");
+  AddFunction("asin");
+  AddFunction("acos");
+  AddFunction("atan");
+  AddFunction("atan2");
+  if (m_type == Type::Output)
   {
-    // Logic/Math:
-    AddFunction("if");
-    AddFunction("not");
-    AddFunction("min");
-    AddFunction("max");
-    AddFunction("clamp");
-    AddFunction("minus");
-    AddFunction("pow");
-    AddFunction("sqrt");
-    AddFunction("sin");
-    AddFunction("cos");
-    AddFunction("tan");
-    AddFunction("asin");
-    AddFunction("acos");
-    AddFunction("atan");
-    AddFunction("atan2");
-    m_functions_combo->insertSeparator(m_functions_combo->count());
-    m_functions_parameters.push_back(QStringLiteral(""));
-    // State/time based:
-    AddFunction("onPress");
-    AddFunction("onRelease");
-    AddFunction("onChange");
-    AddFunction("onHold");
-    AddFunction("onTap");
-    AddFunction("cache");
-    AddFunction("toggle");
-    AddFunction("sharedRelative");
-    AddFunction("relativeToSpeed");
-    AddFunction("smooth");
-    AddFunction("pulse");
-    AddFunction("timer");
-    AddFunction("interval");
-    m_functions_combo->insertSeparator(m_functions_combo->count());
-    m_functions_parameters.push_back(QStringLiteral(""));
-    // Recordings:
-    AddFunction("average");
-    AddFunction("sum");
-    AddFunction("record");
-    AddFunction("sequence");
-    AddFunction("lag");
-    m_functions_combo->insertSeparator(m_functions_combo->count());
-    m_functions_parameters.push_back(QStringLiteral(""));
-    // Stick helpers:
-    AddFunction("deadzone");
-    AddFunction("antiDeadzone");
-    AddFunction("bezierCurve");
-    AddFunction("antiAcceleration");
-    m_functions_combo->insertSeparator(m_functions_combo->count());
-    m_functions_parameters.push_back(QStringLiteral(""));
-    // Meta/Focus:
-    AddFunction("gameSpeed");
-    AddFunction("timeToInputFrames");
-    AddFunction("videoToInputFrames");
-    AddFunction("hasFocus");
-    // These functions can't be used on input settings (they would just be ignored)
-    if (m_type == Type::Input)
-    {
-      AddFunction("ignoreFocus");
-      AddFunction("ignoreOnFocusChange");
-      AddFunction("requireFocus");
-    }
-  }
-  else
-  {
-    // Misc:
     AddFunction("scaleSet");
+  }
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // State/time based:
+  AddFunction("onPress");
+  AddFunction("onRelease");
+  AddFunction("onChange");
+  AddFunction("onHold");
+  AddFunction("onTap");
+  AddFunction("cache");
+  AddFunction("toggle");
+  AddFunction("sharedRelative");
+  AddFunction("relativeToSpeed");
+  AddFunction("smooth");
+  AddFunction("pulse");
+  AddFunction("timer");
+  AddFunction("interval");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // Recordings:
+  AddFunction("average");
+  AddFunction("sum");
+  AddFunction("record");
+  AddFunction("sequence");
+  AddFunction("lag");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // Stick helpers:
+  AddFunction("deadzone");
+  AddFunction("antiDeadzone");
+  AddFunction("bezierCurve");
+  AddFunction("antiAcceleration");
+  m_functions_combo->insertSeparator(m_functions_combo->count());
+  m_functions_parameters.push_back(QStringLiteral(""));
+  // Meta/Focus:
+  AddFunction("gameSpeed");
+  AddFunction("aspectRatio");
+  AddFunction("timeToInputFrames");
+  AddFunction("videoToInputFrames");
+  AddFunction("hasFocus");
+  // These functions can't be used on input settings (they would just be ignored)
+  if (m_type != Type::InputSetting)
+  {
     AddFunction("requireFocus");
-    AddFunction("gameSpeed");
-    AddFunction("cache");
+  }
+  AddFunction("ignoreFocus");
+  // These wouldn't make sense on outputs or inputs settings
+  if (m_type == Type::Input)
+  {
+    AddFunction("ignoreOnFocusChange");
   }
 
   m_variables_combo = new QComboBoxWithMouseWheelDisabled(this);
@@ -681,16 +675,17 @@ void IOWindow::ConnectWidgets()
     m_select_button->setEnabled(any_selected);
   });
   
-  //To use dolphin tooltips if possible
   connect(m_help_button, &QPushButton::clicked, [this] {
     QString help_tooltip =
         tr("You can either simply bind an %1 or use functions\nand operators to achieve more "
-           "complex results.\nYou can bind controls from multiple devices.\nSome inputs are "
-           "relative and might need to be converted\nto a rate or smoothed over time to be "
-           "correctly mapped.\nSee more "
+           "complex results.\nYou can bind controls from multiple devices.%2\nSee more "
            "at https://wiki.dolphin-emu.org/index.php?title=Input_Syntax")
-            .arg(m_type != Type::Input ? tr("output") : tr("input"));
-    QToolTip::showText(QCursor::pos(), help_tooltip);
+            .arg(m_type != Type::Input ? tr("output") : tr("input"))
+            .arg(m_type != Type::Input ?
+                     QString() :
+                     tr("\nSome inputs are relative and might need to be converted\nto a rate or "
+                        "smoothed over time to be correctly mapped."));
+    QToolTip::showText(QCursor::pos(), help_tooltip, this);
   });
 
   connect(&Settings::Instance(), &Settings::ReleaseDevices, this, &IOWindow::ReleaseDevices);

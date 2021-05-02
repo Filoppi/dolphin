@@ -115,20 +115,19 @@ void EmulatedController::CacheInputAndRefreshOutput()
 {
   const auto state_lock = GetStateLock();
   const auto devices_input_lock = GetDevicesInputLock();
-  const bool restore_outputs = g_controller_interface.HasInputChannelJustStarted();
 
   for (auto& ctrlGroup : groups)
   {
     for (auto& control : ctrlGroup->controls)
     {
-      // We could easily also always cache/refresh outputs here, but we don't really want because
-      // it's mostly useless and they'd be one "frame" late (also we'd need to remove the call to
-      // UpdateState() within SetState()).
-      if (control->control_ref->IsInput())
-        control->control_ref->UpdateState();
-      // If we have unpaused, restore outputs in the first frame, as they had been reset
-      else if (restore_outputs)
-        control->control_ref->UpdateState();
+      // Cache inputs and refresh/apply outputs here.
+      // This guarantees accurate timings in our control expressions,
+      // and allows us to use all kinds of functions in outputs.
+      // The only slight downside is that outputs will be applied a max of one input frame late.
+      // Unfortunately outputs are set at random times by the emulation, so we don't have a reliable
+      // place where to update them instead of here, especially because their functions also follow
+      // the ControllerInterface timings.
+      control->control_ref->UpdateState();
     }
 
     for (auto& setting : ctrlGroup->numeric_settings)

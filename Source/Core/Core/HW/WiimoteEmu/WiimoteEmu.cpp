@@ -48,6 +48,7 @@
 #include "InputCommon/ControllerEmu/ControlGroup/IMUGyroscope.h"
 #include "InputCommon/ControllerEmu/ControlGroup/ModifySettingsButton.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Tilt.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 namespace WiimoteEmu
 {
@@ -717,6 +718,8 @@ bool Wiimote::IsUpright() const
 
 void Wiimote::SetRumble(bool on)
 {
+  // This can be called at "any" time, we need to make sure the input channel is right
+  g_controller_interface.SetInputChannel(ciface::InputChannel::Bluetooth);
   const auto lock = GetStateLock();
   m_rumble->controls.front()->control_ref->SetState(on);
 }

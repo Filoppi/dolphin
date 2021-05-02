@@ -16,6 +16,7 @@
 #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
 #include "InputCommon/ControllerEmu/ControlGroup/MixedTriggers.h"
 #include "InputCommon/ControllerEmu/StickGate.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 #include "InputCommon/GCPadStatus.h"
 
@@ -175,6 +176,8 @@ GCPadStatus GCPad::GetInput()
 
 void GCPad::SetOutput(const ControlState strength)
 {
+  // This can be called at "any" time, we need to make sure the input channel is right
+  g_controller_interface.SetInputChannel(ciface::InputChannel::SerialInterface);
   const auto lock = GetStateLock();
   m_rumble->controls[0]->control_ref->SetState(strength);
 }
