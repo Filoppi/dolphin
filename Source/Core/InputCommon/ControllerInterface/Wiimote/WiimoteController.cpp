@@ -297,8 +297,7 @@ Device::Device(std::unique_ptr<WiimoteReal::Wiimote> wiimote) : m_wiimote(std::m
   AddInput(new UndetectableAnalogInput<float>(&m_battery, "Battery", 1.f));
   AddInput(new UndetectableAnalogInput<WiimoteEmu::ExtensionNumber>(
       &m_extension_number_input, "Attached Extension", WiimoteEmu::ExtensionNumber(1)));
-  AddInput(new UndetectableAnalogInput<bool>(
-      &m_mplus_attached_input, "Attached MotionPlus", 1));
+  AddInput(new UndetectableAnalogInput<bool>(&m_mplus_attached_input, "Attached MotionPlus", 1));
 
   AddOutput(new Motor(&m_rumble_level));
 }

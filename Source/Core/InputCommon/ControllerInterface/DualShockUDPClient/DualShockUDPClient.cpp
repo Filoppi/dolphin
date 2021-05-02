@@ -317,7 +317,7 @@ static void HotplugThreadFunc()
   {
     using namespace std::chrono;
     using namespace std::chrono_literals;
-    
+
     const auto now = SteadyClock::now();
     if (now >= s_next_listports_time)
     {

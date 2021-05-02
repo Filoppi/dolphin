@@ -75,9 +75,7 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 // nothing needed
 #endif
 #ifdef CIFACE_USE_OSX
-  if (m_wsi.type == WindowSystemType::MacOS)
-    ciface::OSX::Init(wsi.render_window);
-// nothing needed for Quartz
+// nothing needed for OSX and Quartz
 #endif
 #ifdef CIFACE_USE_SDL
   ciface::SDL::Init();

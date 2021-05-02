@@ -17,9 +17,10 @@ void Attachments::AddAttachment(std::unique_ptr<EmulatedController> att)
 
 u32 Attachments::GetSelectedAttachment() const
 {
+  // This is originally an int, treat it as such
   const int value = m_selection_value.GetValue();
 
-  if (value > 0 && value < m_attachments.size())
+  if (value > 0 && value < static_cast<int>(m_attachments.size()))
     return u32(value);
 
   return 0;
