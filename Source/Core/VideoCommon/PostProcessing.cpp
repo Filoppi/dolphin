@@ -434,8 +434,10 @@ void PostProcessing::RecompileShader()
   // and pipelines even if there might not be need to.
 
   m_default_pipeline.reset();
+  m_default_pipeline_2.reset();
   m_pipeline.reset();
   m_default_pixel_shader.reset();
+  m_default_pixel_shader_2.reset();
   m_pixel_shader.reset();
   m_default_vertex_shader.reset();
   m_vertex_shader.reset();
@@ -450,6 +452,7 @@ void PostProcessing::RecompileShader()
 void PostProcessing::RecompilePipeline()
 {
   m_default_pipeline.reset();
+  m_default_pipeline_2.reset();
   m_pipeline.reset();
   CompilePipeline();
 }
@@ -501,6 +504,7 @@ void PostProcessing::BlitFromTexture(const MathUtil::Rectangle<int>& dst,
   std::vector<u8>* uniform_staging_buffer = &m_default_uniform_staging_buffer;
   bool default_uniform_staging_buffer = true;
   const MathUtil::Rectangle<int> present_rect = g_presenter->GetTargetRectangle();
+  AbstractFramebuffer* const previous_framebuffer = g_gfx->GetCurrentFramebuffer();
 
   // Intermediary pass.
   // We draw to a high quality intermediary texture for a couple reasons:
@@ -510,8 +514,6 @@ void PostProcessing::BlitFromTexture(const MathUtil::Rectangle<int>& dst,
   // -Keep the post process phase in linear space, to better operate with colors
   if (m_default_pipeline && needs_default_pipeline && needs_intermediary_buffer)
   {
-    AbstractFramebuffer* const previous_framebuffer = g_gfx->GetCurrentFramebuffer();
-
     // We keep the min number of layers as the render target,
     // as in case of OpenGL, the source FBX will have two layers,
     // but we will render onto two separate frame buffers (one by one),
@@ -563,6 +565,8 @@ void PostProcessing::BlitFromTexture(const MathUtil::Rectangle<int>& dst,
     src_layer = 0;
     uniform_staging_buffer = &m_uniform_staging_buffer;
     default_uniform_staging_buffer = false;
+
+    //TODO: run m_default_pipeline_2 here, following the example below
   }
   else
   {
@@ -591,16 +595,35 @@ void PostProcessing::BlitFromTexture(const MathUtil::Rectangle<int>& dst,
   // Final pass, either a user selected shader or the default (fixed) shader.
   if (final_pipeline)
   {
-    FillUniformBuffer(src_rect, src_tex, src_layer, g_gfx->GetCurrentFramebuffer()->GetRect(),
-                      present_rect, uniform_staging_buffer->data(), !default_uniform_staging_buffer,
-                      false);
-    g_vertex_manager->UploadUtilityUniforms(uniform_staging_buffer->data(),
-                                            static_cast<u32>(uniform_staging_buffer->size()));
-
-    g_gfx->SetViewportAndScissor(
-        g_gfx->ConvertFramebufferRectangle(dst, g_gfx->GetCurrentFramebuffer()));
-    g_gfx->SetPipeline(final_pipeline);
-    g_gfx->Draw(0, 3);
+    bool other = final_pipeline != m_default_pipeline.get() &&
+                 m_default_pipeline.get() != nullptr &&
+                 m_intermediary_frame_buffer.get() != nullptr;
+    static int additional = 0;  // Test running the same pass multiple times
+    int num = 1 + (other ? additional : 0);
+    for (int i = 0; i < num; i++)
+    {
+      MathUtil::Rectangle<int> dst_final = dst;
+      bool intermediary_buffer = false;
+      if (other && (i != num - 1))
+      {
+        g_gfx->SetFramebuffer(m_intermediary_frame_buffer.get());
+        dst_final = g_gfx->GetCurrentFramebuffer()->GetRect();
+        intermediary_buffer = true;
+      }
+      else
+      {
+        g_gfx->SetFramebuffer(previous_framebuffer);
+      }
+      FillUniformBuffer(src_rect, src_tex, src_layer, g_gfx->GetCurrentFramebuffer()->GetRect(),
+                        present_rect, uniform_staging_buffer->data(),
+                        !default_uniform_staging_buffer, intermediary_buffer);
+      g_vertex_manager->UploadUtilityUniforms(uniform_staging_buffer->data(),
+                                              static_cast<u32>(uniform_staging_buffer->size()));
+      g_gfx->SetViewportAndScissor(
+          g_gfx->ConvertFramebufferRectangle(dst_final, g_gfx->GetCurrentFramebuffer()));
+      g_gfx->SetPipeline(final_pipeline);
+      g_gfx->Draw(0, 3);
+    }
   }
 }
 
@@ -960,6 +983,7 @@ void PostProcessing::FillUniformBuffer(const MathUtil::Rectangle<int>& src,
 bool PostProcessing::CompilePixelShader()
 {
   m_default_pixel_shader.reset();
+  m_default_pixel_shader_2.reset();
   m_pixel_shader.reset();
 
   // Generate GLSL and compile the new shaders:
@@ -977,6 +1001,8 @@ bool PostProcessing::CompilePixelShader()
   {
     m_default_uniform_staging_buffer.resize(0);
   }
+
+  //TODO: compile "m_default_pixel_shader_2" just like "m_default_pixel_shader", but with different code
 
   m_config.LoadShader(g_ActiveConfig.sPostProcessingShader);
   m_pixel_shader = g_gfx->CreateShaderFromSource(
@@ -1050,6 +1076,10 @@ bool PostProcessing::CompilePipeline()
   // We continue even if it failed, it will be skipped later on
   if (config.pixel_shader)
     m_default_pipeline = g_gfx->CreatePipeline(config);
+
+  config.pixel_shader = m_default_pixel_shader_2.get();
+  if (config.pixel_shader)
+    m_default_pipeline_2 = g_gfx->CreatePipeline(config);
 
   config.vertex_shader = m_vertex_shader.get();
   config.geometry_shader = UseGeometryShaderForPostProcess(false) ?

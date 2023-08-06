@@ -134,7 +134,9 @@ protected:
   PostProcessingConfiguration::ConfigMap m_default_options;
   std::unique_ptr<AbstractShader> m_default_vertex_shader;
   std::unique_ptr<AbstractShader> m_default_pixel_shader;
+  std::unique_ptr<AbstractShader> m_default_pixel_shader_2;
   std::unique_ptr<AbstractPipeline> m_default_pipeline;
+  std::unique_ptr<AbstractPipeline> m_default_pipeline_2;
   std::unique_ptr<AbstractFramebuffer> m_intermediary_frame_buffer;
   std::unique_ptr<AbstractTexture> m_intermediary_color_texture;
   std::vector<u8> m_default_uniform_staging_buffer;
