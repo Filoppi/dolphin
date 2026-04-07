@@ -542,6 +542,7 @@ std::string GenerateTextureReinterpretShader(TextureFormat from_format, TextureF
   }
   break;
 
+  //TODO
   case TextureFormat::RGB565:
   {
     code.Write("  float4 temp_value = ");

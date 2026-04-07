@@ -155,6 +155,8 @@ void DXTexture::CopyRectangleFromTexture(const AbstractTexture* src,
   const DXTexture* srcentry = static_cast<const DXTexture*>(src);
   ASSERT(src_rect.GetWidth() == dst_rect.GetWidth() &&
          src_rect.GetHeight() == dst_rect.GetHeight());
+  //TODO: add support for different formats if this happens!
+  ASSERT(src->GetFormat() == GetFormat());
 
   D3D11_BOX src_box;
   src_box.left = src_rect.left;
@@ -189,6 +191,12 @@ void DXTexture::Load(u32 level, u32 width, u32 height, u32 row_length, const u8*
                      size_t buffer_size, u32 layer)
 {
   size_t src_pitch = CalculateStrideForFormat(m_config.format, row_length);
+  if (m_texture.Get())
+    return;
+  //TODO: support for mismatching formats and ... support for HDR scene textures!
+  D3D11_TEXTURE2D_DESC desc;
+  m_texture->GetDesc(&desc);
+  ASSERT(desc.Format != DXGI_FORMAT_R16G16B16A16_FLOAT);
   D3D::context->UpdateSubresource(m_texture.Get(),
                                   D3D11CalcSubresource(level, layer, m_config.levels), nullptr,
                                   buffer, static_cast<UINT>(src_pitch), 0);
@@ -250,10 +258,13 @@ void DXStagingTexture::CopyFromTexture(const AbstractTexture* src,
          src_rect.top >= 0 && static_cast<u32>(src_rect.bottom) <= src->GetHeight());
   ASSERT(dst_rect.left >= 0 && static_cast<u32>(dst_rect.right) <= m_config.width &&
          dst_rect.top >= 0 && static_cast<u32>(dst_rect.bottom) <= m_config.height);
+  // Formats are generally not compatible with each other
+  ASSERT(src->GetFormat() == GetFormat());
 
   if (IsMapped())
     DXStagingTexture::Unmap();
 
+  //TODO: add support for different formats!
   if (static_cast<u32>(src_rect.GetWidth()) == GetWidth() &&
       static_cast<u32>(src_rect.GetHeight()) == GetHeight())
   {
@@ -285,10 +296,12 @@ void DXStagingTexture::CopyToTexture(const MathUtil::Rectangle<int>& src_rect, A
          src_rect.top >= 0 && static_cast<u32>(src_rect.bottom) <= GetHeight());
   ASSERT(dst_rect.left >= 0 && static_cast<u32>(dst_rect.right) <= dst->GetWidth() &&
          dst_rect.top >= 0 && static_cast<u32>(dst_rect.bottom) <= dst->GetHeight());
+  ASSERT(dst->GetFormat() == GetFormat());
 
   if (IsMapped())
     DXStagingTexture::Unmap();
 
+  // TODO: add support for different formats!
   if (static_cast<u32>(src_rect.GetWidth()) == dst->GetWidth() &&
       static_cast<u32>(src_rect.GetHeight()) == dst->GetHeight())
   {
@@ -449,6 +462,7 @@ DXFramebuffer::Create(DXTexture* color_attachment, DXTexture* depth_attachment,
     if (FAILED(hr))
       return nullptr;
 
+#if 0 // Can't cast float to int textures
     // Only create the integer RTV when logic ops are supported (Win8+).
     DXGI_FORMAT integer_format =
         D3DCommon::GetRTVFormatForAbstractFormat(color_attachment->GetFormat(), true);
@@ -460,6 +474,7 @@ DXFramebuffer::Create(DXTexture* color_attachment, DXTexture* depth_attachment,
       ASSERT_MSG(VIDEO, SUCCEEDED(hr),
                  "Failed to create integer render target view for framebuffer: {}", DX11HRWrap(hr));
     }
+#endif
   }
 
   std::vector<ComPtr<ID3D11RenderTargetView>> additional_rtvs;

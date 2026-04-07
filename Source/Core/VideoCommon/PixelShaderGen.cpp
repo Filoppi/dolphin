@@ -201,7 +201,7 @@ PixelShaderUid GetPixelShaderUid()
   uid_data->bounding_box = g_ActiveConfig.bBBoxEnable && g_bounding_box->IsEnabled();
   uid_data->rgba6_format =
       bpmem.zcontrol.pixel_format == PixelFormat::RGBA6_Z24 && !g_ActiveConfig.bForceTrueColor;
-  uid_data->dither = bpmem.blendmode.dither && uid_data->rgba6_format;
+  uid_data->dither = bpmem.blendmode.dither && uid_data->rgba6_format; //TODO: disable dither in HDR?
   uid_data->uint_output = bpmem.blendmode.UseLogicOp();
 
   u32 numStages = uid_data->genMode_numtevstages + 1;

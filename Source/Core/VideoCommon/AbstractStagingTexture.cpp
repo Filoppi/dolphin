@@ -110,11 +110,17 @@ void AbstractStagingTexture::WriteTexels(const MathUtil::Rectangle<int>& rect, c
   }
 }
 
-void AbstractStagingTexture::WriteTexel(u32 x, u32 y, const void* in_ptr)
+void AbstractStagingTexture::WriteTexel(u32 x, u32 y, const void* in_ptr,
+                                        AbstractTextureFormat format)
 {
   ASSERT(m_type != StagingTextureType::Readback);
   if (!PrepareForAccess())
     return;
+
+  if (format != AbstractTextureFormat::Undefined && format != GetFormat())
+  {
+    //TODO: convert input data on the spot? Here and in all other read/write/map funcs?
+  }
 
   ASSERT(x < m_config.width && y < m_config.height);
   char* dest_ptr = m_map_pointer + y * m_map_stride + x * m_texel_size;

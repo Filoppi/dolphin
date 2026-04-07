@@ -123,10 +123,12 @@ AbstractTextureFormat FramebufferManager::GetEFBColorFormat()
   // - 24-bit RGBA (6-bit components) with 24-bit Z
   // - Multisampled 16-bit RGB (5-6-5 format) with 16-bit Z
   // We only use one EFB format here: 32-bit ARGB with 32-bit Z.
+  // The texture will then be live converted to the expected format
+  // in the CPU directly on CPU memory.
   // Multisampling depends on user settings.
   // The distinction becomes important for certain operations, i.e. the
   // alpha channel should be ignored if the EFB does not have one.
-  return AbstractTextureFormat::RGBA8;
+  return AbstractTextureFormat::RGBA16F; //TODO?
 }
 
 AbstractTextureFormat FramebufferManager::GetEFBDepthFormat()

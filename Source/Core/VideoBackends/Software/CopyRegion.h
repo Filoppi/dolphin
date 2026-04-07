@@ -23,6 +23,8 @@ void CopyRegion(const T* const source, const MathUtil::Rectangle<int>& srcrect, 
 
   double x_ratio = srcrect.GetWidth() / static_cast<double>(dstrect.GetWidth());
   double y_ratio = srcrect.GetHeight() / static_cast<double>(dstrect.GetHeight());
+  //TODO: do better resampling if this happens!
+  ASSERT(x_ratio >= 0.5 && x_ratio <= 2.0 && y_ratio >= 0.5 && y_ratio <= 2.0);
 
   for (int y_off = 0; y_off < copy_height; y_off++)
   {

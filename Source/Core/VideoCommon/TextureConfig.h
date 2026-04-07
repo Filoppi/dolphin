@@ -74,7 +74,7 @@ struct TextureConfig
   u32 levels = 1;
   u32 layers = 1;
   u32 samples = 1;
-  AbstractTextureFormat format = AbstractTextureFormat::RGBA8;
+  AbstractTextureFormat format = AbstractTextureFormat::RGBA8; //TODO: HDR?
   u32 flags = 0;
   AbstractTextureType type = AbstractTextureType::Texture_2DArray;
 };

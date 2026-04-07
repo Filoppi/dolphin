@@ -77,7 +77,8 @@ public:
   // specified stride (length in bytes of each row). After updating the staging texture with all
   // changes, call CopyToTexture() to update the GPU copy.
   void WriteTexels(const MathUtil::Rectangle<int>& rect, const void* in_ptr, u32 in_stride);
-  void WriteTexel(u32 x, u32 y, const void* in_ptr);
+  void WriteTexel(u32 x, u32 y, const void* in_ptr,
+                  AbstractTextureFormat format = AbstractTextureFormat::Undefined);
 
 protected:
   bool PrepareForAccess();

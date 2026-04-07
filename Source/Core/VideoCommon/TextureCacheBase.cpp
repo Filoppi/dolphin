@@ -64,6 +64,8 @@ static const int TEXTURE_POOL_KILL_THRESHOLD = 3;
 
 static int xfb_count = 0;
 
+constexpr AbstractTextureFormat main_color_format = AbstractTextureFormat::RGBA8;
+
 std::unique_ptr<TextureCacheBase> g_texture_cache;
 
 TCacheEntry::TCacheEntry(std::unique_ptr<AbstractTexture> tex,
@@ -412,8 +414,10 @@ void TextureCacheBase::ScaleTextureCacheEntryTo(RcTcacheEntry& entry, u32 new_wi
     return;
   }
 
-  const TextureConfig newconfig(new_width, new_height, 1, entry->GetNumLayers(), 1,
-                                AbstractTextureFormat::RGBA8, AbstractTextureFlag_RenderTarget,
+  ASSERT(entry->GetNumLevels() == 1);
+  ASSERT(entry->GetFormat() == AbstractTextureFormat::RGBA8 || entry->GetFormat() == AbstractTextureFormat::RGBA16F);
+  const TextureConfig newconfig(new_width, new_height, entry->GetNumLevels(), entry->GetNumLayers(),
+                                1, entry->GetFormat(), AbstractTextureFlag_RenderTarget,
                                 AbstractTextureType::Texture_2DArray);
   std::optional<TexPoolEntry> new_texture = AllocateTexture(newconfig);
   if (!new_texture)
@@ -1701,7 +1705,7 @@ RcTcacheEntry TextureCacheBase::CreateTextureEntry(
     const u32 width = texture_info.GetRawWidth();
     const u32 height = texture_info.GetRawHeight();
 
-    const TextureConfig config(width, height, texLevels, 1, 1, AbstractTextureFormat::RGBA8, 0,
+    const TextureConfig config(width, height, texLevels, 1, 1, main_color_format, 0,
                                AbstractTextureType::Texture_2DArray);
     entry = AllocateCacheEntry(config);
     if (!entry) [[unlikely]]
@@ -1888,7 +1892,7 @@ RcTcacheEntry TextureCacheBase::GetXFBTexture(u32 address, u32 width, u32 height
   }
 
   // Create a new VRAM texture, and fill it with the data from guest RAM.
-  entry = AllocateCacheEntry(TextureConfig(width, height, 1, 1, 1, AbstractTextureFormat::RGBA8,
+  entry = AllocateCacheEntry(TextureConfig(width, height, 1, 1, 1, AbstractTextureFormat::RGBA16F, //TODO
                                            AbstractTextureFlag_RenderTarget,
                                            AbstractTextureType::Texture_2DArray));
 
@@ -2347,8 +2351,8 @@ void TextureCacheBase::CopyRenderTargetToTexture(
   {
     // create the texture
     const TextureConfig config(scaled_tex_w, scaled_tex_h, 1, g_framebuffer_manager->GetEFBLayers(),
-                               1, AbstractTextureFormat::RGBA8, AbstractTextureFlag_RenderTarget,
-                               AbstractTextureType::Texture_2DArray);
+                               1, AbstractTextureFormat::RGBA16F, AbstractTextureFlag_RenderTarget,
+                               AbstractTextureType::Texture_2DArray); //TODO: HDR?
     entry = AllocateCacheEntry(config);
     if (entry)
     {
@@ -2835,7 +2839,7 @@ bool TextureCacheBase::CreateUtilityTextures()
 {
   constexpr TextureConfig encoding_texture_config(
       EFB_WIDTH * 4, 1024, 1, 1, 1, AbstractTextureFormat::BGRA8, AbstractTextureFlag_RenderTarget,
-      AbstractTextureType::Texture_2DArray);
+      AbstractTextureType::Texture_2DArray); //TODO: why BGRA?
   m_efb_encoding_texture = g_gfx->CreateTexture(encoding_texture_config, "EFB encoding texture");
   if (!m_efb_encoding_texture)
     return false;

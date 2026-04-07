@@ -415,7 +415,10 @@ CustomAssetLibrary::LoadInfo DirectFilesystemAssetLibrary::LoadTexture(const Ass
     auto& slice = data->m_texture.m_slices[0];
     // If we have no levels, create one to pass into LoadPNGTexture
     if (slice.m_levels.empty())
+    {
       slice.m_levels.push_back({});
+      slice.m_levels.at(0).format = AbstractTextureFormat::RGBA8;
+    }
 
     if (!LoadPNGTexture(&slice.m_levels[0], PathToString(texture_path->second)))
     {
@@ -464,6 +467,7 @@ bool DirectFilesystemAssetLibrary::LoadMips(const std::filesystem::path& asset_p
       return true;
 
     VideoCommon::CustomTextureData::ArraySlice::Level level;
+    level.format = AbstractTextureFormat::RGBA8;
     if (extension_lower == ".dds")
     {
       if (!LoadDDSTexture(&level, full_path, mip_level))

@@ -462,7 +462,7 @@ FramebufferState GetColorFramebufferState(AbstractTextureFormat format)
 
 FramebufferState GetRGBA8FramebufferState()
 {
-  return GetColorFramebufferState(AbstractTextureFormat::RGBA8);
+  return GetColorFramebufferState(AbstractTextureFormat::RGBA16F); //TODO: HDR?
 }
 
 }  // namespace RenderState

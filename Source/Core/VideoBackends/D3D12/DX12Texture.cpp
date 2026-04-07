@@ -254,6 +254,8 @@ void DXTexture::Load(u32 level, u32 width, u32 height, u32 row_length, const u8*
   // Both paths need us in COPY_DEST state, and avoids switching back and forth for mips.
   TransitionToState(D3D12_RESOURCE_STATE_COPY_DEST);
 
+  ASSERT(GetFormat() != AbstractTextureFormat::RGBA16F);
+
   ComPtr<ID3D12Resource> staging_buffer;
   ID3D12Resource* upload_buffer_resource;
   void* upload_buffer_ptr;
@@ -749,6 +751,8 @@ bool DXStagingTexture::Map()
 {
   if (m_map_pointer)
     return true;
+
+  ASSERT(GetFormat() != AbstractTextureFormat::RGBA16F);
 
   const D3D12_RANGE read_range = {0u, m_type == StagingTextureType::Upload ? 0u : m_buffer_size};
   HRESULT hr = m_resource->Map(0, &read_range, reinterpret_cast<void**>(&m_map_pointer));
